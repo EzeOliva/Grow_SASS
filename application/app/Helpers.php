@@ -3715,5 +3715,41 @@ function recurringCycleFormat($cycle = '', $interval = 1) {
     default:
         $foo = $bar;
     }
+}
 
+if (! function_exists('currentLangCode')) {
+    /**
+     *  This is to return current selected language and convert short name. 
+     *
+     * @return $string - selected language
+     */
+    function currentLangCode(): string
+    {
+        // Normalize input
+        $name = strtolower(trim(strtolower(\App::getLocale())));
+
+        $map = [
+            'english'    => 'en',
+            'spanish'    => 'es',
+            'french'     => 'fr',
+            'german'     => 'de',
+            'japanese'   => 'ja',
+            'korean'     => 'ko',
+            'chinese'    => 'zh',
+            'ukrainian'  => 'uk',
+            'russian'    => 'ru',
+            'portuguese' => 'pt',
+            'italian'    => 'it',
+            'arabic'     => 'ar',
+            'dutch'      => 'nl',
+            'polish'     => 'pl',
+            'turkish'    => 'tr',
+            'swedish'    => 'sv',
+            'czech'      => 'cs',
+            'hindi'      => 'hi',
+            // Add more if needed
+        ];
+
+        return $map[$name] ?? 'en'; // Default to 'en' if unknown
+    }
 }

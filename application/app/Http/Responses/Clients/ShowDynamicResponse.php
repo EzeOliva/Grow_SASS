@@ -31,7 +31,7 @@ class ShowDynamicResponse implements Responsable {
             $$key = $value;
         }
 
-        return view('pages/client/wrapper', compact('page', 'client', 'owner', 'tags'))->render();
+        return view('pages/client/wrapper', compact('page', 'client', 'owner', 'tags', 'stats'))->render();
     }
 
 }

@@ -346,6 +346,7 @@ class Clients extends Controller {
         $payload = [
             'page' => $page,
             'client' => $client,
+            'stats' => $this->clientrepo->getCustomerSuccessStats($id),
             'owner' => $owner,
             'tags' => $tags,
         ];
