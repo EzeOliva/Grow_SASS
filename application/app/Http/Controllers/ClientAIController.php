@@ -29,7 +29,7 @@ class ClientAIController extends Controller
         $messages = [
             [
                 'role' => 'system',
-                'content' => 'You are an expert assistant for client analysis. Answer clearly and helpfully.'
+                'content' => 'Eres un asistente experto en análisis de clientes. Responde con claridad y eficacia.'
             ],
             [
                 'role' => 'user',

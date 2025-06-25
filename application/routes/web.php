@@ -5,9 +5,7 @@ Route::get("test", "Test@index");
 Route::post("test", "Test@index");
 
 //HOME PAGE
-Route::any('/', function () {
-    return redirect('/home');
-});
+Route::redirect('/', '/home')->name('root');
 Route::any('home', 'Home@index')->name('home');
 
 //LOGIN & SIGNUP

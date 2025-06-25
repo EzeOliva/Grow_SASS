@@ -1,0 +1,57 @@
+----- Added 24/06/2025 ------
+ALTER TABLE clients
+  ADD COLUMN client_module_feedback VARCHAR(255) NULL AFTER client_mapping_id;
+
+ALTER TABLE roles
+  ADD COLUMN role_feedback TINYINT(1) NOT NULL DEFAULT 2 AFTER modules,
+  ADD COLUMN role_expectation TINYINT(1) NOT NULL DEFAULT 1 AFTER role_feedback;
+  
+ CREATE TABLE `feedbacks` (
+  `feedback_id` int(11) NOT NULL,
+  `client_id` int(11) NOT NULL,
+  `feedback_date` date DEFAULT NULL,
+  `comment` text DEFAULT NULL,
+  `feedback_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `feedback_updated` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE `feedback_details` (
+  `feedback_detail_id` int(11) NOT NULL,
+  `feedback_id` int(11) NOT NULL,
+  `feedback_query_id` int(11) NOT NULL,
+  `value` int(11) NOT NULL,
+  `feedback_detail_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `feedback_detail_updated` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE `feedback_queries` (
+  `feedback_query_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `content` text NOT NULL,
+  `note` text DEFAULT NULL,
+  `type` smallint(6) NOT NULL DEFAULT 1,
+  `range` smallint(6) NOT NULL DEFAULT 5,
+  `weight` double(5,2) NOT NULL DEFAULT 1.00,
+  `feedback_query_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `feedback_query_updated` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;
+
+
+-- ----------------------------
+-- Records of feedback_queries
+-- ----------------------------
+INSERT INTO `feedback_queries` VALUES (1, 'NPS', 'On a scale from 0 to 10, how likely are you to recommend our product/service to a friend or colleague?', NULL, 1, 10, 1.00, '2025-06-23 18:53:32', '2025-06-23 18:53:32');
+INSERT INTO `feedback_queries` VALUES (2, 'CSAT', 'How satisfied are you with your recent experience with our service?', NULL, 2, 5, 1.00, '2025-06-23 18:54:00', '2025-06-23 18:54:00');
+INSERT INTO `feedback_queries` VALUES (3, 'CES', 'How easy was it to resolve your issue today?', NULL, 1, 7, 1.00, '2025-06-23 18:54:26', '2025-06-23 18:54:26');
+
+CREATE TABLE `client_expectations` (
+  `client_expectation_id` int(11) NOT NULL,
+  `client_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `content` text DEFAULT NULL,
+  `weight` decimal(5,2) DEFAULT 1.00,
+  `due_date` date NOT NULL,
+  `status` enum('pending','fulfilled') DEFAULT 'pending',
+  `expectation_created` datetime DEFAULT current_timestamp(),
+  `expectation_updated` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;

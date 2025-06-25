@@ -5881,7 +5881,7 @@ sidebar navigation
   list-style: none;
 }
 .sidebar-nav ul li a {
-  color: #626878;
+  color: #000;
   padding: 12px 35px 10px 15px;
   display: block;
   font-size: 14px;
@@ -5927,7 +5927,7 @@ sidebar navigation
   font-size: 21px;
   display: inline-block;
   vertical-align: middle;
-  color: #626878;
+  color: #000;
 }
 .sidebar-nav > ul > li > a i .hide-menu {
   display: inline-block;
@@ -5970,7 +5970,7 @@ sidebar navigation
   height: 7px;
   border-width: 1px 0 0 1px;
   border-style: solid;
-  border-color: #626878;
+  border-color: #000;
   right: 20px;
   -webkit-transform: rotate(135deg) translate(0, -50%);
   transform: rotate(135deg) translate(0, -50%);
@@ -5997,7 +5997,7 @@ sidebar navigation
 }
 
 .sidebar-nav .has-arrow::after {
-  border-color: #626878;
+  border-color: #000;
 }
 
 /****************
@@ -12752,13 +12752,13 @@ Background Colors
 }
 .topbar .top-navbar .navbar-header .navbar-brand .light-logo {
   display: none;
-  color: #626878;
+  color: #000;
 }
 .topbar .navbar-light .navbar-nav .nav-item > a.nav-link {
-  color: #626878 !important;
+  color: #000 !important;
 }
 .topbar .navbar-light .navbar-nav .nav-item > a.nav-link:hover, .topbar .navbar-light .navbar-nav .nav-item > a.nav-link:focus {
-  color: #626878 !important;
+  color: #000 !important;
 }
 
 /*******************
@@ -12868,7 +12868,7 @@ a.link:hover, a.link:focus {
 }
 
 .sidebar-nav > ul > li > a i {
-  color: #626878;
+  color: #000;
 }
 
 #main-sidenav {

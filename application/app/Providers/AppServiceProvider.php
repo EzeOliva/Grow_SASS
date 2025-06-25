@@ -16,7 +16,7 @@ class AppServiceProvider extends ServiceProvider {
     public function boot(UrlGenerator $url) {
 
         //[growcrm] disable debug bar in production mode
-        if (!env('APP_DEBUG_TOOLBAR')) {
+        if (class_exists(\Debugbar::class) && !env('APP_DEBUG_TOOLBAR', false)) {
             \Debugbar::disable();
         }
 

@@ -178,7 +178,7 @@
             data-loading-target="embed-content-container"
             data-dynamic-url="{{url('clients') }}/{{ $client->client_id }}/clientai"
             data-url="{{url('clients') }}/{{ $client->client_id }}/client-clientai"
-            href="#clients_ajaxtab" role="tab"><i class="fas fa-robot mr-2"></i>{{ cleanLang(__('lang.clientai')) }}</a>
+            href="#clients_ajaxtab" role="tab"><i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>{{ cleanLang(__('lang.clientai')) }}</a>
     </li>
 
     <!--[MODULES] - dynamic menu-->

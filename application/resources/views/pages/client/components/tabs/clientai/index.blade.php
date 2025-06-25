@@ -6,7 +6,7 @@
     {{-- Summary Section --}}
     <div id="ai-summary" class="alert alert-primary shadow-sm fade show rounded">
         <h5 class="mb-2">
-            <i class="fas fa-brain mr-2 text-info"></i> {{ __('lang.ai_insight_summary') }}
+            <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i> {{ __('lang.ai_insight_summary') }}
         </h5>
         <p class="mb-0" id="summaryContent">
             <i class="fas fa-spinner fa-spin text-muted"></i> {{ __('lang.loading_client_insights') }}

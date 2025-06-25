@@ -383,125 +383,126 @@ class ClientAIRepository
         $expectationsSummary = $this->calculateExpectationsSummary($expectations);
 
         // --- Summarize Data ---
-        $prompt[] = "You are an expert business analyst AI. Here is a comprehensive profile of a client from our CRM system.";
+        $prompt[] = "Eres una IA experta en análisis de negocios. Aquí tienes un perfil integral de un cliente de nuestro sistema CRM.";
         $prompt[] = "\nClient Profile:";
-        $prompt[] = "- Company Name: {$client->client_company_name}";
-        $prompt[] = "- Industry: " . ($client->industry ?? 'N/A');
-        $prompt[] = "- Category: " . ($client->category ?? 'N/A');
+        $prompt[] = "- Nombre de la empresa: {$client->client_company_name}";
+        $prompt[] = "- Industria: " . ($client->industry ?? 'N/A');
+        $prompt[] = "- Categoria: " . ($client->category ?? 'N/A');
         $prompt[] = "- Status: " . ($client->client_status ?? 'N/A');
-        $prompt[] = "- Joined: {$client->client_created} (" . ($daysSinceJoined !== null ? "$daysSinceJoined days ago" : 'N/A') . ")";
-        $prompt[] = "- Description: " . ($client->client_description ?? 'N/A');
+        $prompt[] = "- Fecha de registro: {$client->client_created} (" . ($daysSinceJoined !== null ? "hace $daysSinceJoined días" : 'N/A') . ")";
+        $prompt[] = "- Descripcion: " . ($client->client_description ?? 'N/A');
         $prompt[] = "- Website: " . ($client->client_website ?? 'N/A');
-        $prompt[] = "- Phone: " . ($client->client_phone ?? 'N/A');
+        $prompt[] = "- Telefono: " . ($client->client_phone ?? 'N/A');
         $prompt[] = "- VAT: " . ($client->client_vat ?? 'N/A') . "\n";
 
-        $prompt[] = "Contacts (Total: {$users->count()}):";
+        $prompt[] = "Contactos (Total: {$users->count()}):";
         foreach ($users as $user) {
-            $roleName = $user->role_name ?? 'No Role';
+            $roleName = $user->role_name ?? 'Sin rol';
             $prompt[] = "- {$user->first_name} {$user->last_name} ({$user->email}), Role: {$roleName}, Type: {$user->type}";
         }
 
-        $prompt[] = "\nProjects (Total: {$projects->count()}, Last: " . ($lastProject ? $lastProject->project_created . ", $daysSinceLastProject days ago" : 'N/A') . "):";
+        $prompt[] = "\nProyectos (Total: {$projects->count()}, Ultimo: " . ($lastProject ? $lastProject->project_created . ", $daysSinceLastProject dias atras" : 'N/A') . "):";
         foreach ($projects->take(5) as $project) {
-            $prompt[] = "- {$project->project_title} (Status: {$project->project_status}, Category: {$project->project_category}, Created: {$project->project_created}, Deadline: {$project->project_date_due})";
+            $prompt[] = "- {$project->project_title} (Status: {$project->project_status}, Categoria: {$project->project_category}, Credo: {$project->project_created}, Fecha limite: {$project->project_date_due})";
         }
 
-        $prompt[] = "\nProject Tasks (Total: {$projectTasks->count()}):";
+        $prompt[] = "\nTareas (Total: {$projectTasks->count()}):";
         foreach ($projectTasks->take(5) as $task) {
-            $assignedUser = $task->assigned_users ?? 'Unassigned';
-            $prompt[] = "- {$task->task_title} (Project: {$task->project_title}, Status: {$task->task_status}, Assigned: {$assignedUser}, Due: {$task->task_date_due})";
+            $assignedUser = $task->assigned_users ?? 'Sin asignar';
+            $prompt[] = "- {$task->task_title} (Proyecto: {$task->project_title}, Status: {$task->task_status}, Asignado: {$assignedUser}, Vencimiento: {$task->task_date_due})";
         }
 
-        $prompt[] = "\nFinancial Summary:";
-        $prompt[] = "- Total Invoiced: {$totalInvoiced}";
-        $prompt[] = "- Total Paid: {$totalPaid}";
-        $prompt[] = "- Outstanding Balance: {$outstandingBalance}";
+        $prompt[] = "\nResumen Financiero:";
+        $prompt[] = "- Total Facturado: {$totalInvoiced}";
+        $prompt[] = "- Total Pagado: {$totalPaid}";
+        $prompt[] = "- Saldo Pendiente: {$outstandingBalance}";
 
-        $prompt[] = "\nInvoices (Total: {$invoices->count()}, Last: " . ($lastInvoice ? $lastInvoice->bill_date . ", $daysSinceLastInvoice days ago" : 'N/A') . "):";
+        $prompt[] = "\nFacturas (Total: {$invoices->count()}, Última: " . ($lastInvoice ? $lastInvoice->bill_date . ", hace $daysSinceLastInvoice días" : 'N/A') . "):";
         foreach ($invoices->take(5) as $invoice) {
-            $prompt[] = "- Invoice #{$invoice->bill_invoiceid}, Amount: {$invoice->bill_final_amount}, Status: {$invoice->bill_status}, Category: {$invoice->invoice_category}, Date: {$invoice->bill_date}";
+            $prompt[] = "- Factura #{$invoice->bill_invoiceid}, Monto: {$invoice->bill_final_amount}, Estado: {$invoice->bill_status}, Categoría: {$invoice->invoice_category}, Fecha: {$invoice->bill_date}";
         }
 
-        $prompt[] = "\nPayments (Total: {$payments->count()}, Last: " . ($lastPayment ? $lastPayment->payment_date . ", $daysSinceLastPayment days ago" : 'N/A') . "):";
+        $prompt[] = "\nPagos (Total: {$payments->count()}, Último: " . ($lastPayment ? $lastPayment->payment_date . ", hace $daysSinceLastPayment días" : 'N/A') . "):";
         foreach ($payments->take(5) as $payment) {
-            $prompt[] = "- Payment #{$payment->payment_id}, Amount: {$payment->payment_amount}, Gateway: {$payment->payment_gateway}, Date: {$payment->payment_date}";
+            $prompt[] = "- Pago #{$payment->payment_id}, Monto: {$payment->payment_amount}, Pasarela: {$payment->payment_gateway}, Fecha: {$payment->payment_date}";
         }
 
-        $prompt[] = "\nEnhanced Feedback Analysis:";
-        $prompt[] = "- Total Feedback Entries: {$feedbacks->count()}";
-        $prompt[] = "- Last Feedback: " . ($lastFeedback ? $lastFeedback->feedback_created . ", $daysSinceLastFeedback days ago" : 'N/A');
-        $prompt[] = "- Average Overall Score: {$feedbackSummary['average_score']}";
-        $prompt[] = "- Feedback Trend: {$feedbackSummary['trend']}";
-        $prompt[] = "- Most Recent Feedback: " . ($lastFeedback ? "\"{$lastFeedback->comment}\"" : 'N/A');
+        $prompt[] = "\nAnálisis Mejorado de Feedback:";
+        $prompt[] = "- Total de Entradas de Feedback: {$feedbacks->count()}";
+        $prompt[] = "- Último Feedback: " . ($lastFeedback ? $lastFeedback->feedback_created . ", hace $daysSinceLastFeedback días" : 'N/A');
+        $prompt[] = "- Puntaje Promedio General: {$feedbackSummary['average_score']}";
+        $prompt[] = "- Tendencia del Feedback: {$feedbackSummary['trend']}";
+        $prompt[] = "- Feedback Más Reciente: " . ($lastFeedback ? "\"{$lastFeedback->comment}\"" : 'N/A');
 
-        $prompt[] = "\nDetailed Feedback Breakdown:";
+        $prompt[] = "\nDetalle de Feedback:";
         foreach ($feedbackDetails->take(10) as $fd) {
-            $userName = $fd->first_name ? "{$fd->first_name} {$fd->last_name}" : 'Anonymous';
-            $prompt[] = "- Query: \"{$fd->query_title}\" - Score: {$fd->value}/{$fd->query_range} (Weight: {$fd->query_weight}) - User: {$userName} - Date: {$fd->feedback_date}";
+            $userName = $fd->first_name ? "{$fd->first_name} {$fd->last_name}" : 'Anónimo';
+            $prompt[] = "- Consulta: \"{$fd->query_title}\" - Puntaje: {$fd->value}/{$fd->query_range} (Peso: {$fd->query_weight}) - Usuario: {$userName} - Fecha: {$fd->feedback_date}";
         }
 
-        $prompt[] = "\nClient Expectations (Total: {$expectations->count()}, Last: " . ($lastExpectation ? $lastExpectation->expectation_created . ", $daysSinceLastExpectation days ago" : 'N/A') . "):";
-        $prompt[] = "- Fulfilled: {$expectationsSummary['fulfilled_count']} ({$expectationsSummary['fulfilled_percent']}%)";
-        $prompt[] = "- Pending: {$expectationsSummary['pending_count']}";
-        $prompt[] = "- Overdue: {$expectationsSummary['overdue_count']}";
+        $prompt[] = "\nExpectativas del Cliente (Total: {$expectations->count()}, Última: " . ($lastExpectation ? $lastExpectation->expectation_created . ", hace $daysSinceLastExpectation días" : 'N/A') . "):";
+        $prompt[] = "- Cumplidas: {$expectationsSummary['fulfilled_count']} ({$expectationsSummary['fulfilled_percent']}%)";
+        $prompt[] = "- Pendientes: {$expectationsSummary['pending_count']}";
+        $prompt[] = "- Vencidas: {$expectationsSummary['overdue_count']}";
         foreach ($expectations->take(5) as $exp) {
-            $prompt[] = "- \"{$exp->title}\" (Status: {$exp->status}, Due: {$exp->due_date}, Weight: {$exp->weight})";
+            $prompt[] = "- \"{$exp->title}\" (Estado: {$exp->status}, Vence: {$exp->due_date}, Peso: {$exp->weight})";
         }
 
-        $prompt[] = "\nSupport Tickets (Total: {$tickets->count()}, Last: " . ($lastTicket ? $lastTicket->ticket_created . ", $daysSinceLastTicket days ago" : 'N/A') . "):";
+        $prompt[] = "\nTickets de Soporte (Total: {$tickets->count()}, Último: " . ($lastTicket ? $lastTicket->ticket_created . ", hace $daysSinceLastTicket días" : 'N/A') . "):";
         foreach ($tickets->take(5) as $ticket) {
-            $prompt[] = "- Ticket #{$ticket->ticket_id}, Subject: {$ticket->ticket_subject}, Status: {$ticket->ticket_status}, Created: {$ticket->ticket_created}";
+            $prompt[] = "- Ticket #{$ticket->ticket_id}, Asunto: {$ticket->ticket_subject}, Estado: {$ticket->ticket_status}, Creado: {$ticket->ticket_created}";
         }
 
-        $prompt[] = "\nNotes (Total: {$notes->count()}, Last: " . ($lastNote ? $lastNote->note_created . ", $daysSinceLastNote days ago" : 'N/A') . "):";
+        $prompt[] = "\nNotas (Total: {$notes->count()}, Última: " . ($lastNote ? $lastNote->note_created . ", hace $daysSinceLastNote días" : 'N/A') . "):";
         foreach ($notes->take(5) as $note) {
-            $creator = $note->creator_first_name ? "{$note->creator_first_name} {$note->creator_last_name}" : 'Unknown';
-            $prompt[] = "- \"{$note->note_title}\": {$note->note_description} (Created by: {$creator}, Date: {$note->note_created})";
+            $creator = $note->creator_first_name ? "{$note->creator_first_name} {$note->creator_last_name}" : 'Desconocido';
+            $prompt[] = "- \"{$note->note_title}\": {$note->note_description} (Creado por: {$creator}, Fecha: {$note->note_created})";
         }
 
-        $prompt[] = "\nFiles (Total: {$files->count()}):";
+        $prompt[] = "\nArchivos (Total: {$files->count()}):";
         foreach ($files->take(5) as $file) {
-            $creator = $file->creator_first_name ? "{$file->creator_first_name} {$file->creator_last_name}" : 'Unknown';
-            $prompt[] = "- {$file->file_filename} (Type: {$file->file_type}, Size: {$file->file_size}, Created by: {$creator})";
+            $creator = $file->creator_first_name ? "{$file->creator_first_name} {$file->creator_last_name}" : 'Desconocido';
+            $prompt[] = "- {$file->file_filename} (Tipo: {$file->file_type}, Tamaño: {$file->file_size}, Creado por: {$creator})";
         }
 
-        $prompt[] = "\nTags:";
+        $prompt[] = "\nEtiquetas:";
         if ($tags->count() > 0) {
             foreach ($tags as $tag) {
-                $prompt[] = "- {$tag->tag_title}";
+            $prompt[] = "- {$tag->tag_title}";
             }
         } else {
-            $prompt[] = "- No tags assigned";
+            $prompt[] = "- Sin etiquetas asignadas";
         }
 
-        $prompt[] = "\nEstimates (Total: {$estimates->count()}):";
+        $prompt[] = "\nEstimaciones (Total: {$estimates->count()}):";
         foreach ($estimates->take(3) as $estimate) {
-            $prompt[] = "- Estimate #{$estimate->bill_estimateid}, Amount: {$estimate->bill_final_amount}, Status: {$estimate->bill_status}, Category: {$estimate->estimate_category}";
+            $prompt[] = "- Estimación #{$estimate->bill_estimateid}, Monto: {$estimate->bill_final_amount}, Estado: {$estimate->bill_status}, Categoría: {$estimate->estimate_category}";
         }
 
-        $prompt[] = "\nContracts (Total: {$contracts->count()}):";
+        $prompt[] = "\nContratos (Total: {$contracts->count()}):";
         foreach ($contracts->take(3) as $contract) {
-            $prompt[] = "- Contract #{$contract->doc_id}, Title: {$contract->doc_title}, Status: {$contract->doc_status}";
+            $prompt[] = "- Contrato #{$contract->doc_id}, Título: {$contract->doc_title}, Estado: {$contract->doc_status}";
         }
 
-        $prompt[] = "\nProposals (Total: {$proposals->count()}):";
+        $prompt[] = "\nPropuestas (Total: {$proposals->count()}):";
         foreach ($proposals->take(3) as $proposal) {
-            $prompt[] = "- Proposal #{$proposal->doc_id}, Title: {$proposal->doc_title}, Status: {$proposal->doc_status}";
+            $prompt[] = "- Propuesta #{$proposal->doc_id}, Título: {$proposal->doc_title}, Estado: {$proposal->doc_status}";
         }
 
-        $prompt[] = "\nExpenses (Total: {$expenses->count()}):";
+        $prompt[] = "\nGastos (Total: {$expenses->count()}):";
         foreach ($expenses->take(3) as $expense) {
-            $prompt[] = "- Expense #{$expense->expense_id}, Amount: {$expense->expense_amount}, Category: {$expense->expense_category}, Description: {$expense->expense_description}";
+            $prompt[] = "- Gasto #{$expense->expense_id}, Monto: {$expense->expense_amount}, Categoría: {$expense->expense_category}, Descripción: {$expense->expense_description}";
         }
 
-        $prompt[] = "\nPlease analyze this client and provide:";
-        $prompt[] = "1. A comprehensive summary of the client's current status and relationship with us.";
-        $prompt[] = "2. Key insights from feedback analysis, including satisfaction trends and specific concerns.";
-        $prompt[] = "3. Financial health assessment based on payment history and outstanding balances.";
-        $prompt[] = "4. Risk assessment based on expectations, project status, and communication patterns.";
-        $prompt[] = "5. Specific recommendations for improving client satisfaction and retention.";
-        $prompt[] = "6. Opportunities for upselling or expanding services based on their needs.";
-        $prompt[] = "7. Any red flags or areas requiring immediate attention.";
+        $prompt[] = "\nPor favor analiza este cliente y proporciona:";
+        $prompt[] = "1️⃣ Un resumen integral del estado actual del cliente y su relación con nosotros.";
+        $prompt[] = "📊 Principales hallazgos del análisis de feedback, incluyendo tendencias de satisfacción y preocupaciones específicas.";
+        $prompt[] = "💰 Evaluación de salud financiera basada en el historial de pagos y saldos pendientes.";
+        $prompt[] = "⚠️ Evaluación de riesgos basada en expectativas, estado de proyectos y patrones de comunicación.";
+        $prompt[] = "🛠️ Recomendaciones específicas para mejorar la satisfacción y retención del cliente.";
+        $prompt[] = "📈 Oportunidades para ventas adicionales o expansión de servicios según sus necesidades.";
+        $prompt[] = "🚨 Cualquier alerta o área que requiera atención inmediata.";
+
 
         return implode("\n", $prompt);
     }
@@ -514,7 +515,7 @@ class ClientAIRepository
         if ($feedbackDetails->isEmpty()) {
             return [
                 'average_score' => 'N/A',
-                'trend' => 'No feedback available'
+                'trend' => 'No hay feedback disponible'
             ];
         }
 
@@ -538,7 +539,7 @@ class ClientAIRepository
         $averageScore = count($feedbackScores) > 0 ? round(array_sum($feedbackScores) / count($feedbackScores), 2) : 0;
 
         // Determine trend (simplified - you could make this more sophisticated)
-        $trend = 'Stable';
+        $trend = 'Estable';
         if (count($feedbackScores) >= 2) {
             $recentScores = array_slice($feedbackScores, 0, 3);
             $olderScores = array_slice($feedbackScores, -3);
@@ -547,9 +548,9 @@ class ClientAIRepository
             $olderAvg = array_sum($olderScores) / count($olderScores);
             
             if ($recentAvg > $olderAvg + 0.5) {
-                $trend = 'Improving';
+                $trend = 'Mejorando';
             } elseif ($recentAvg < $olderAvg - 0.5) {
-                $trend = 'Declining';
+                $trend = 'En declive';
             }
         }
 
