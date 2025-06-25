@@ -35,6 +35,41 @@ class ClientAIRepository
                 ->get();
         }
 
+        if (in_array('communication', $topics)) {
+            // IDs de proyectos y tareas del cliente
+            $projectIds = DB::table('projects')
+                ->where('project_clientid', $clientId)
+                ->pluck('project_id');
+
+            $taskIds = DB::table('tasks')
+                ->where(function ($q) use ($clientId, $projectIds) {
+                    $q->where('task_clientid', $clientId)      // si lo grabas directo
+                    ->orWhereIn('task_projectid', $projectIds); // si solo hereda del proyecto
+                })
+                ->pluck('task_id');
+
+            // Comentarios de proyectos
+            $projectComments = DB::table('comments')
+                ->where('commentresource_type', 'project')
+                ->whereIn('commentresource_id', $projectIds)
+                ->whereBetween('comment_created', [$startDate, $endDate])
+                ->select('comment_text', 'comment_created', 'comment_creatorid')
+                ->get();
+
+            // Comentarios de tareas
+            $taskComments = DB::table('comments')
+                ->where('commentresource_type', 'task')
+                ->whereIn('commentresource_id', $taskIds)
+                ->whereBetween('comment_created', [$startDate, $endDate])
+                ->select('comment_text', 'comment_created', 'comment_creatorid')
+                ->get();
+
+            $data['communication'] = $projectComments
+                ->merge($taskComments)
+                ->sortByDesc('comment_created')
+                ->values();
+        }
+        
         return $data;
     }
 
@@ -85,6 +120,18 @@ class ClientAIRepository
             $summary .= "- Overdue expectations: {$s['overdue_count']}\n";
             $summary .= "- Total expectations: {$s['total_count']}\n";
         }
+
+        if (!empty($data['communication'])) {
+            $summary .= "\nComentarios en proyectos y tareas:\n";
+            foreach ($data['communication']->take(10) as $com) {
+                $author = DB::table('users')
+                            ->where('id', $com->comment_creatorid)
+                            ->value(DB::raw("CONCAT(first_name,' ',last_name)"));
+                $summary .= "- {$com->comment_created} – {$author}: “{$com->comment_text}”\n";
+            }
+            $summary .= "- Total en periodo: {$data['communication']->count()} comentarios\n";
+        }
+
 
         return $summary;
     }
@@ -194,6 +241,40 @@ class ClientAIRepository
             ->groupBy('tasks.task_id')
             ->orderByDesc('tasks.task_created')
             ->get();
+
+        // --- Comentarios (Proyecto + Tarea) ---
+        $commentQuery = DB::table('comments')
+            ->select('comments.*', 'users.first_name', 'users.last_name')
+            ->leftJoin('users', 'users.id', '=', 'comments.comment_creatorid')
+            ->where(function ($q) use ($clientId) {
+                $q->where(function ($q2) use ($clientId) {
+                    // Comentarios de proyectos
+                    $q2->where('commentresource_type', 'project')
+                        ->whereIn('commentresource_id', function ($sub) use ($clientId) {
+                            $sub->select('project_id')
+                                ->from('projects')
+                                ->where('project_clientid', $clientId);
+                        });
+                })->orWhere(function ($q2) use ($clientId) {
+                    // Comentarios de tareas
+                    $q2->where('commentresource_type', 'task')
+                        ->whereIn('commentresource_id', function ($sub) use ($clientId) {
+                            $sub->select('task_id')
+                                ->from('tasks')
+                                ->where('task_clientid', $clientId)
+                                ->orWhereIn('task_projectid', function ($p) use ($clientId) {
+                                    $p->select('project_id')
+                                    ->from('projects')
+                                    ->where('project_clientid', $clientId);
+                                });
+                        });
+                });
+            })
+            ->orderByDesc('comment_created')
+            ->get();
+        $lastComment = $commentQuery->first();
+        $daysSinceLastComment = $lastComment ? Carbon::parse($lastComment->comment_created)->diffInDays($now) : null;
+
 
         // --- Invoices with Line Items ---
         $invoices = DB::table('invoices')
@@ -411,6 +492,14 @@ class ClientAIRepository
             $assignedUser = $task->assigned_users ?? 'Sin asignar';
             $prompt[] = "- {$task->task_title} (Proyecto: {$task->project_title}, Status: {$task->task_status}, Asignado: {$assignedUser}, Vencimiento: {$task->task_date_due})";
         }
+
+        $prompt[] = "\nComunicación (comentarios) – Total: {$commentQuery->count()}, Último: " .
+            ($lastComment ? $lastComment->comment_created . ", hace $daysSinceLastComment días" : 'N/A');
+            foreach ($commentQuery->take(5) as $comm) {
+                $author = trim(($comm->first_name ?? '') . ' ' . ($comm->last_name ?? ''));
+                $prompt[] = "- {$comm->comment_created} – {$author}: “{$comm->comment_text}”";
+            }
+
 
         $prompt[] = "\nResumen Financiero:";
         $prompt[] = "- Total Facturado: {$totalInvoiced}";
