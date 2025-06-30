@@ -573,7 +573,7 @@ return [
   'features' => "Características",
   'february_short' => "feb",
   'february' => "febrero",
-  'feedback' => "Comentario",
+  'feedback' => "Feedback",
   'female' => "Mujer",
   'file_name' => "Nombre del archivo",
   'file_not_found' => "No se pudo encontrar el archivo",
