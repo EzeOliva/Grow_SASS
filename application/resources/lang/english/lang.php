@@ -2935,5 +2935,16 @@ return [
     'ask' => 'Ask',
     'raw_client_data_snapshot' => 'Raw Client Data Snapshot',
     'thinking' => 'Thinking...',
-    'error_reaching_ai' => 'Error reaching AI.'
+    'error_reaching_ai' => 'Error reaching AI.',
+    'health_status' => 'Health S',
+
+    'health'=> 'Health',
+    
+    //--------------New Filter Fields-------------------
+    'expectation_fulfillment' => 'Expectation Fulfillment',
+    'green'  => 'Healthy',
+    'yellow' => 'At Risk',
+    'red'    => 'Critical',
+    'min' => 'Min',
+    'max' => 'Max',
 ];
