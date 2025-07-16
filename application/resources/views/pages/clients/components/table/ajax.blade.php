@@ -8,6 +8,20 @@
             {{ $client->client_id }}
         </td>
 
+        <!--tableconfig_column_29 [AI Analysis Button]-->
+        @if(config('table.tableconfig_column_29'))
+        <td class="clients_analyze_ai {{ config('table.tableconfig_column_29') }} tableconfig_column_29">
+            <button type="button"
+               class="ai-analysis-btn js-ajax-ux-request reset-target-modal-form btn btn-sm btn-link text-success p-0"
+               data-toggle="modal" data-target="#basicModal"
+               data-url="{{ route('clients.analyze.ai', $client->client_id) }}"
+               data-loading-target="basicModal"
+               data-placement="top" title="AI Client Analysis">
+                <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>
+            </button>
+        </td>
+        @endif
+
         <!--tableconfig_column_2 [client_company_name]-->
         <td class="clients_col_company {{ config('table.tableconfig_column_2') }} tableconfig_column_2"
             id="clients_col_id_{{ $client->client_id }}">
@@ -215,23 +229,18 @@
         </td>
         <!--tableconfig_column_26 [status]-->
         <td class="col_status {{ config('table.tableconfig_column_26') }} tableconfig_column_26">
-            <span class="label label-outline-default">{{ $client->expectation_fulfillment . "%" }}</span>
+            {{ $client->expectation_fulfillment . "%" }}
         </td>
         <!--tableconfig_column_27 [status]-->
         <td class="col_status {{ config('table.tableconfig_column_27') }} tableconfig_column_27">
-            @if(!is_null($client->average_feedback) && $client->average_feedback !== '')
-                {{ $client->average_feedback }} ⭐
-            @endif
+            {{ $client->average_feedback }}
         </td>
-
         <!--tableconfig_column_28 [status]-->
         <td class="col_status {{ config('table.tableconfig_column_28') }} tableconfig_column_28">
-            <span class="label label-outline-{{ $client->health_status == 'green' ? 'success' : ($client->health_status == 'yellow' ? 'warning' : 'danger') }}">
-               {{ cleanLang(__('lang.' . $client->health_status)) }}
+            <span class="badge badge-{{ $client->health_status == 'green' ? 'success' : ($client->health_status == 'yellow' ? 'warning' : 'danger') }}">
+                {{ ucfirst($client->health_status) }}
             </span>
         </td>
-
-
 
 
         <!--actions-->

@@ -2858,4 +2858,16 @@ return [
     'red' => 'Crítico',
     'min' => 'Mín',
     'max' => 'Máx',
+
+    'ai_client_analysis' => 'Análisis de Cliente IA',
+    'analyzing_client_feedback' => 'Analizando comentarios del cliente...',
+    'loading_analysis' => 'Cargando análisis...',
+    'feedback' => 'Comentarios',
+    'expectations' => 'Expectativas',
+    'projects' => 'Proyectos',
+    'comments' => 'Comentarios',
+    'ai_analysis' => 'Análisis de IA',
+    'generate_ai_analysis' => 'Generar análisis de IA',
+    'generate_ai_analysis_tooltip' => 'Generar análisis impulsado por IA',
+    'generating_analysis' => 'Generando análisis...', 
 ];

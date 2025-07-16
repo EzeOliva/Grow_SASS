@@ -14,6 +14,13 @@
                                         class="sorting-icons"><i class="ti-arrows-vertical"></i></span></a>
                             </th>
 
+                            <!--tableconfig_column_29 [AI Analysis Button]-->
+                            @if(config('table.tableconfig_column_29'))
+                            <th class="col_ai_analysis {{ config('table.tableconfig_column_29') }} tableconfig_column_29" title="AI Analysis">
+                                <i class="fas fa-wand-magic-sparkles text-warning mr-2" data-toggle="tooltip" data-placement="top" title="AI Analysis"></i>
+                            </th>
+                            @endif
+
                             <!--tableconfig_column_2 [client_company_name]-->
                             <th
                                 class="col_client_company_name {{ config('table.tableconfig_column_2') }} tableconfig_column_2">

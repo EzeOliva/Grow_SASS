@@ -35,6 +35,10 @@ use App\Http\Responses\Projects\PrefillProjectResponse;
 use App\Http\Responses\Projects\RemoveCoverResponse;
 use App\Http\Responses\Projects\SetFileCoverResponse;
 use App\Http\Responses\Projects\ShowDynamicResponse;
+use App\Http\Responses\Projects\AnalyzeAIResponse;
+use App\Http\Responses\Projects\AnalyzeAITasksResponse;
+use App\Http\Responses\Projects\AnalyzeAITeamResponse;
+use App\Http\Responses\Projects\AnalyzeAIBillingResponse;
 use App\Http\Responses\Projects\ShowResponse;
 use App\Http\Responses\Projects\StoreCloneResponse;
 use App\Http\Responses\Projects\StoreResponse;
@@ -65,6 +69,9 @@ use App\Repositories\ProjectRepository;
 use App\Repositories\TagRepository;
 use App\Repositories\TimerRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\TaskRepository;
+use App\Repositories\InvoiceRepository;
+use App\Repositories\EstimateRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -123,6 +130,31 @@ class Projects extends Controller {
      */
     protected $filefolderrepo;
 
+    /**
+     * The task repository instance.
+     */
+    protected $taskrepo;
+
+    /**
+     * The invoice repository instance.
+     */
+    protected $invoicerepo;
+
+    /**
+     * The estimate repository instance.
+     */
+    protected $estimaterepo;
+
+    /**
+     * The time repository instance.
+     */
+    protected $timerepo;
+
+    /**
+     * The project assigned repository instance.
+     */
+    protected $projectassignedrepo;
+
     //contruct
     public function __construct(
         ProjectRepository $projectrepo,
@@ -134,7 +166,12 @@ class Projects extends Controller {
         EmailerRepository $emailerrepo,
         FileRepository $filerepo,
         FileFolderRepository $filefolderrepo,
-        CustomFieldsRepository $customrepo) {
+        CustomFieldsRepository $customrepo,
+        TaskRepository $taskrepo,
+        InvoiceRepository $invoicerepo,
+        EstimateRepository $estimaterepo,
+        TimerRepository $timerepo,
+        ProjectAssignedRepository $projectassignedrepo) {
 
         //parent
         parent::__construct();
@@ -150,6 +187,11 @@ class Projects extends Controller {
         $this->emailerrepo = $emailerrepo;
         $this->customrepo = $customrepo;
         $this->filefolderrepo = $filefolderrepo;
+        $this->taskrepo = $taskrepo;
+        $this->invoicerepo = $invoicerepo;
+        $this->estimaterepo = $estimaterepo;
+        $this->timerepo = $timerepo;
+        $this->projectassignedrepo = $projectassignedrepo;
 
         //authenticated
         $this->middleware('auth');
@@ -949,6 +991,313 @@ class Projects extends Controller {
         return new DestroyResponse($payload);
 
     }
+
+    public function analyzeAI(ProjectAssignedRepository $assignedrepo,$id) {   
+
+        //get the project with all related data
+        $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+        
+        if (!$project = $project->first()) {
+            abort(409, __('lang.project_not_found'));
+        }
+
+        //get tasks data for analysis via repository
+        $tasks = $this->taskrepo->search('', ['apply_filters' => false, 'taskresource_id' => $id, 'extended_mode' => false, 'no_pagination' => true]);
+
+        //get team members and their workload via repository
+        $teamMembers = $assignedrepo->getAssigned($id);
+
+        //get billing data via repositories
+        $invoices = $this->invoicerepo->search('', ['apply_filters' => false, 'bill_projectid' => $id, 'no_pagination' => true]);
+        $estimates = $this->estimaterepo->search('', ['apply_filters' => false, 'bill_projectid' => $id, 'no_pagination' => true]);
+        $contracts = \App\Models\Contract::where('doc_project_id', $id)->get();
+        $timers = $this->timerepo->search('', ['apply_filters' => false, 'timer_projectid' => $id, 'timer_status' => 'stopped', 'timer_billing_status' => 'unbilled', 'no_pagination' => true]);
+
+        $payload = [
+            'project' => $project,
+            'tasks' => $tasks,
+            'team_members' => $teamMembers,
+            'invoices' => $invoices,
+            'estimates' => $estimates,
+            'contracts' => $contracts,
+            'unbilled_timers' => $timers,
+        ];
+
+        return new AnalyzeAIResponse($payload);
+    }
+
+    /**
+     * AI Analysis - Tasks Tab
+     * @param int $id project id
+     * @return \Illuminate\Http\Response
+     */
+    public function analyzeAITasks($id) {
+        
+        //get the project
+        $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+        
+        if (!$project = $project->first()) {
+            abort(409, __('lang.project_not_found'));
+        }
+
+        //get tasks with detailed analysis
+        $tasks = \App\Models\Task::where('task_projectid', $id)
+            ->with(['assigned', 'milestone'])
+            ->get();
+
+        //analyze tasks for AI insights
+        $patternDone = '/(complet|finaliz|terminad|done|closed)/i';
+        $now = now();
+        $overdueTasks = $tasks->filter(fn($t) =>
+            $t->task_date_due &&
+            $t->task_date_due < $now &&
+            !preg_match($patternDone, $t->taskstatus_title ?? '')
+        );
+
+        $upcomingDeadlines = $tasks->filter(fn($t) =>
+            $t->task_date_due &&
+            $t->task_date_due > $now &&
+            $t->task_date_due <= $now->copy()->addDays(7) &&
+            !preg_match($patternDone, $t->taskstatus_title ?? '')
+        );
+
+        $criticalTasks = $tasks->filter(fn($t) =>
+            $t->task_priority === 'high' &&
+            !preg_match($patternDone, $t->taskstatus_title ?? '')
+        );
+
+
+        //create AI prompt for tasks analysis
+        $aiPrompt = $this->createTasksAnalysisPrompt($project, $tasks, $overdueTasks, $upcomingDeadlines, $criticalTasks);
+
+        $payload = [
+            'project' => $project,
+            'tasks' => $tasks,
+            'overdueTasks' => $overdueTasks,
+            'upcomingDeadlines' => $upcomingDeadlines,
+            'criticalTasks' => $criticalTasks,
+            'aiPrompt' => $aiPrompt,
+        ];
+
+        return new AnalyzeAITasksResponse($payload);
+    }
+
+    /**
+     * AI Analysis - Team Tab
+     * @param int $id project id
+     * @return \Illuminate\Http\Response
+     */
+    public function analyzeAITeam($id) {
+        //get the project
+        $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+        if (!$project = $project->first()) {
+            abort(409, __('lang.project_not_found'));
+        }
+        //get team members with user info via repository
+        $teamMembers = $this->projectassignedrepo->getAssigned($id);
+        //analyze team workload (skip user->tasks logic)
+        $overloadedMembers = collect();
+        $unassignedMembers = collect();
+        $aiPrompt = $this->createTeamAnalysisPrompt($project, $teamMembers, $overloadedMembers, $unassignedMembers);
+        $payload = [
+            'project' => $project,
+            'teamMembers' => $teamMembers,
+            'overloadedMembers' => $overloadedMembers,
+            'unassignedMembers' => $unassignedMembers,
+            'aiPrompt' => $aiPrompt,
+        ];
+        return new AnalyzeAITeamResponse($payload);
+    }
+
+    /**
+     * AI Analysis - Billing Tab
+     * @param int $id project id
+     * @return \Illuminate\Http\Response
+     */
+    public function analyzeAIBilling($id) {
+        
+        //get the project
+        $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+        
+        if (!$project = $project->first()) {
+            abort(409, __('lang.project_not_found'));
+        }
+
+        //get billing data
+        $invoices = \App\Models\Invoice::where('bill_projectid', $id)->get();
+        $estimates = \App\Models\Estimate::where('bill_projectid', $id)->get();
+        $contracts = \App\Models\Contract::where('doc_project_id', $id)->get();
+        $timers = \App\Models\Timer::where('timer_projectid', $id)
+            ->where('timer_status', 'stopped')
+            ->where('timer_billing_status', 'unbilled')
+            ->get();
+
+        //analyze billing status
+        $unbilledHours = $timers->sum('timer_time');
+        $pendingEstimates = $estimates->where('bill_status', 'approved');
+        $pendingContracts = $contracts->where('doc_status', 'awaiting_signatures');
+
+        //create AI prompt for billing analysis
+        $aiPrompt = $this->createBillingAnalysisPrompt($project, $invoices, $estimates, $contracts, $timers, $unbilledHours, $pendingEstimates, $pendingContracts);
+
+        $payload = [
+            'project' => $project,
+            'invoices' => $invoices,
+            'estimates' => $estimates,
+            'contracts' => $contracts,
+            'timers' => $timers,
+            'unbilledHours' => $unbilledHours,
+            'pendingEstimates' => $pendingEstimates,
+            'pendingContracts' => $pendingContracts,
+            'aiPrompt' => $aiPrompt,
+        ];
+
+        return new AnalyzeAIBillingResponse($payload);
+    }
+
+    /**
+     * Create AI prompt for tasks analysis
+     */
+    private function createTasksAnalysisPrompt($project, $tasks, $overdueTasks, $upcomingDeadlines, $criticalTasks) {
+        return "Analiza las tareas de este proyecto y proporciona información:
+
+        PROYECTO: {$project->project_title}
+        TOTAL DE TAREAS: {$tasks->count()}
+        TAREAS VENCIDAS: {$overdueTasks->count()}
+        PRÓXIMAS FECHAS LÍMITE (7 días): {$upcomingDeadlines->count()}
+        TAREAS CRÍTICAS: {$criticalTasks->count()}
+
+        DESGLOSE DE TAREAS:
+        " . $tasks->map(function($task) {
+            return "- {$task->task_title} (Estado: {$task->task_status}, Fecha límite: {$task->task_date_due}, Prioridad: {$task->task_priority})";
+        })->implode("\n") . "
+
+        TAREAS VENCIDAS:
+        " . $overdueTasks->map(function($task) {
+            return "- {$task->task_title} (Vencida hace " . now()->diffInDays($task->task_date_due) . " días)";
+        })->implode("\n") . "
+
+        PRÓXIMAS FECHAS LÍMITE:
+        " . $upcomingDeadlines->map(function($task) {
+            return "- {$task->task_title} (A vencer en " . now()->diffInDays($task->task_date_due, false) . " días)";
+        })->implode("\n") . "
+
+        Por favor proporciona:
+        1. Evaluación de riesgos y recomendaciones
+        2. Acciones prioritarias necesarias
+        3. Análisis del impacto en el cronograma
+        4. Sugerencias de asignación de recursos";
+    }
+
+
+    /**
+     * Create AI prompt for team analysis
+     */
+    private function createTeamAnalysisPrompt($project, $teamMembers, $overloadedMembers, $unassignedMembers) {
+        // For each team member, get their active tasks count using TaskRepository
+        $projectId = $project->project_id;
+        $teamBreakdown = $teamMembers->map(function($member) use ($projectId) {
+            $userId = $member->id;
+            $activeTasks = app(\App\Repositories\TaskRepository::class)
+                ->search('', [
+                    'apply_filters'   => false,
+                    'taskresource_id' => $projectId,
+                    'filter_assigned' => [$userId],
+                    'no_pagination'   => true,
+                ])
+                ->filter(function ($task) {
+                    // Excluir cualquier estado que se considere “completado”
+                    return !preg_match('/(complet|finaliz|terminad|done|closed)/i', $task->task_status)
+                        && $task->task_status != 2;   // mantiene la exclusión del código numérico 2
+                });
+
+            return "- {$member->first_name} {$member->last_name} (Active Tasks: {$activeTasks->count()})";
+        })->implode("\n");
+
+        $overloadedBreakdown = $overloadedMembers->map(function($member) use ($projectId) {
+            $userId = $member->id;
+           $activeTasks = app(\App\Repositories\TaskRepository::class)
+                ->search('', [
+                    'apply_filters'   => false,
+                    'taskresource_id' => $projectId,
+                    'filter_assigned' => [$userId],
+                    'no_pagination'   => true,
+                ])
+                ->filter(fn($t) =>
+                    // excluir cualquier estado que implique finalización
+                    !preg_match('/(complet|finaliz|terminad|done|closed)/i', $t->task_status)
+                    && $t->task_status != 2   // mantiene la exclusión del código numérico 2
+                );
+
+            return "- {$member->first_name} {$member->last_name} (Active Tasks: {$activeTasks->count()})";
+        })->implode("\n");
+
+        $unassignedBreakdown = $unassignedMembers->map(function($member) {
+            return "- {$member->first_name} {$member->last_name} (No tasks assigned)";
+        })->implode("\n");
+
+    return "Analiza la carga de trabajo del equipo de este proyecto y proporciona información:
+
+            PROYECTO: {$project->project_title}
+            MIEMBROS DEL EQUIPO: {$teamMembers->count()}
+            MIEMBROS SOBRECARGADOS: {$overloadedMembers->count()}
+            MIEMBROS SIN ASIGNAR: {$unassignedMembers->count()}
+
+            DESGLOSE DEL EQUIPO:
+            $teamBreakdown
+
+            MIEMBROS SOBRECARGADOS:
+            $overloadedBreakdown
+
+            MIEMBROS SIN ASIGNAR:
+            $unassignedBreakdown
+
+            Por favor, proporciona:
+            1. Análisis de la distribución de la carga de trabajo
+            2. Recomendaciones para optimizar los recursos
+            3. Información sobre la utilización de los miembros del equipo
+            4. Acciones para mejorar la asignación de recursos";
+    }
+
+        /**
+         * Create AI prompt for billing analysis
+         */
+        private function createBillingAnalysisPrompt($project, $invoices, $estimates, $contracts, $timers, $unbilledHours, $pendingEstimates, $pendingContracts) {
+                $totalInvoiced = $invoices->sum('bill_final_amount');
+                $totalPaid = $invoices->where('bill_status', 'paid')->sum('bill_final_amount');
+                $unpaidAmount = $totalInvoiced - $totalPaid;
+                
+                return "Analiza el estado de facturación de este proyecto y proporciona información:
+
+                    PROYECTO: {$project->project_title}
+                    TOTAL FACTURADO: $" . number_format($totalInvoiced, 2) . "
+                    TOTAL PAGADO: $" . number_format($totalPaid, 2) . "
+                    IMPORTE PENDIENTE: $" . number_format($unpaidAmount, 2) . "
+                    HORAS NO FACTURADAS: " . round($unbilledHours / 3600, 2) . " horas
+                    PRESUPUESTOS PENDIENTES: {$pendingEstimates->count()}
+                    CONTRATOS PENDIENTES: {$pendingContracts->count()}
+
+                    FACTURAS:
+                    " . $invoices->map(function($invoice) {
+                        return "- Invoice #{$invoice->bill_invoiceid} (Status: {$invoice->bill_status}, Amount: $" . number_format($invoice->bill_final_amount, 2) . ")";
+                    })->implode("\n") . "
+
+                    PRESUPUESTOS:
+                    " . $estimates->map(function($estimate) {
+                        return "- Estimate #{$estimate->bill_estimateid} (Status: {$estimate->bill_status}, Amount: $" . number_format($estimate->bill_final_amount, 2) . ")";
+                    })->implode("\n") . "
+
+                    CONTRATOS:
+                    " . $contracts->map(function($contract) {
+                        return "- Contract #{$contract->doc_id} (Status: {$contract->doc_status}, Value: $" . number_format($contract->doc_value, 2) . ")";
+                    })->implode("\n") . "
+
+                    Por favor, proporciona:
+                    1. Análisis de flujo de caja y recomendaciones
+                    2. Sugerencias para optimizar la facturación
+                    3. Evaluación de riesgos por importes pendientes
+                    4. Acciones para mejorar la eficiencia de la facturación";
+        }
 
     /**
      * Return ajax details for project
@@ -2514,6 +2863,196 @@ class Projects extends Controller {
 
         //return
         return $stats;
+    }
+
+    /**
+     * Generate AI analysis for tasks
+     */
+    public function generateAITasksAnalysis($id)
+    {
+        try {
+            $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+            if (!$project = $project->first()) {
+                return response()->json(['success' => false, 'message' => 'Project not found']);
+            }
+
+            $tasks = \App\Models\Task::where('task_projectid', $id)
+                ->with(['assigned', 'milestone'])
+                ->get();
+
+            // 1️⃣ Atrasadas
+            $overdueTasks = $tasks->filter(fn($t) =>
+                $t->task_date_due && $t->task_date_due < now() &&
+                !preg_match('/(complet|finaliz|terminad|done|closed)/i', $t->task_status) &&
+                $t->task_status != 2
+            );
+
+            // 2️⃣ Vencen en ≤ 7 días
+            $upcomingDeadlines = $tasks->filter(fn($t) =>
+                $t->task_date_due && $t->task_date_due > now() && $t->task_date_due <= now()->addDays(7) &&
+                !preg_match('/(complet|finaliz|terminad|done|closed)/i', $t->task_status) &&
+                $t->task_status != 2
+            );
+
+            // 3️⃣ Críticas (alta prioridad)
+            $criticalTasks = $tasks->filter(fn($t) =>
+                $t->task_priority === 'high' &&
+                !preg_match('/(complet|finaliz|terminad|done|closed)/i', $t->task_status) &&
+                $t->task_status != 2
+            );
+
+
+            $prompt = $this->createTasksAnalysisPrompt($project, $tasks, $overdueTasks, $upcomingDeadlines, $criticalTasks);
+            
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => 'Eres una inteligencia artificial experta en gestión de proyectos. Analiza las tareas del proyecto y proporciona recomendaciones accionables en un formato breve, claro y profesional.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ];
+
+            $aiResponse = $this->callOpenAI($messages);
+            
+            return response()->json([
+                'success' => true,
+                'analysis' => $aiResponse,
+                'prompt' => $prompt
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI analysis failed: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Generate AI analysis for team
+     */
+    public function generateAITeamAnalysis($id)
+    {
+        try {
+            $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+            if (!$project = $project->first()) {
+                return response()->json(['success' => false, 'message' => 'Project not found']);
+            }
+
+            $teamMembers = $this->projectassignedrepo->getAssigned($id);
+            $overloadedMembers = collect();
+            $unassignedMembers = collect();
+            
+            $prompt = $this->createTeamAnalysisPrompt($project, $teamMembers, $overloadedMembers, $unassignedMembers);
+            
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => 'Eres una inteligencia artificial experta en gestión de proyectos. Analiza la carga de trabajo del equipo y proporciona recomendaciones accionables en un formato breve, claro y profesional.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ];
+
+            $aiResponse = $this->callOpenAI($messages);
+            
+            return response()->json([
+                'success' => true,
+                'analysis' => $aiResponse,
+                'prompt' => $prompt
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI analysis failed: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Generate AI analysis for billing
+     */
+    public function generateAIBillingAnalysis($id)
+    {
+        try {
+            $project = $this->projectrepo->search($id, ['apply_filters' => false]);
+            if (!$project = $project->first()) {
+                return response()->json(['success' => false, 'message' => 'Project not found']);
+            }
+
+            $invoices = \App\Models\Invoice::where('bill_projectid', $id)->get();
+            $estimates = \App\Models\Estimate::where('bill_projectid', $id)->get();
+            $contracts = \App\Models\Contract::where('doc_project_id', $id)->get();
+            $timers = \App\Models\Timer::where('timer_projectid', $id)
+                ->where('timer_status', 'stopped')
+                ->where('timer_billing_status', 'unbilled')
+                ->get();
+
+            $unbilledHours = $timers->sum('timer_time');
+            $pendingEstimates = $estimates->where('bill_status', 'approved');
+            $pendingContracts = $contracts->where('doc_status', 'awaiting_signatures');
+
+            $prompt = $this->createBillingAnalysisPrompt($project, $invoices, $estimates, $contracts, $timers, $unbilledHours, $pendingEstimates, $pendingContracts);
+            
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => 'Eres una inteligencia artificial experta en gestión de proyectos. Analiza la facturación del proyecto y proporciona recomendaciones accionables en un formato breve, claro y profesional.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ];
+
+            $aiResponse = $this->callOpenAI($messages);
+            
+            return response()->json([
+                'success' => true,
+                'analysis' => $aiResponse,
+                'prompt' => $prompt
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI analysis failed: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Call OpenAI API
+     */
+    private function callOpenAI($messages)
+    {
+        try {
+            $response = \OpenAI\Laravel\Facades\OpenAI::chat()->create([
+                'model' => config('openai.model', 'gpt-3.5-turbo'),
+                'messages' => $messages,
+                'max_tokens' => 1000,
+                'temperature' => 0.7
+            ]);
+
+            return $response['choices'][0]['message']['content'];
+
+        } catch (\OpenAI\Exceptions\RateLimitException $e) {
+            throw new \Exception('Rate limit exceeded. Please try again later.');
+        } catch (\OpenAI\Exceptions\AuthenticationException $e) {
+            throw new \Exception('AI service authentication failed.');
+        } catch (\OpenAI\Exceptions\ErrorException $e) {
+            throw new \Exception('AI service error: ' . $e->getMessage());
+        } catch (\OpenAI\Exceptions\TransporterException $e) {
+            throw new \Exception('Connection error. Please check your internet connection.');
+        } catch (\Exception $e) {
+            throw new \Exception('AI analysis failed: ' . $e->getMessage());
+        }
     }
 
 }

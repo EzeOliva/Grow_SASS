@@ -2947,4 +2947,16 @@ return [
     'red'    => 'Critical',
     'min' => 'Min',
     'max' => 'Max',
+
+    'ai_client_analysis' => 'AI Client Analysis',
+    'analyzing_client_feedback' => 'Analyzing client feedback...',
+    'loading_analysis' => 'Loading analysis...',
+    'feedback' => 'Feedback',
+    'expectations' => 'Expectations',
+    'projects' => 'Projects',
+    'comments' => 'Comments',
+    'ai_analysis' => 'AI Analysis',
+    'generate_ai_analysis' => 'Generate AI Analysis',
+    'generate_ai_analysis_tooltip' => 'Generate AI-powered analysis',
+    'generating_analysis' => 'Generating analysis...', 
 ];
