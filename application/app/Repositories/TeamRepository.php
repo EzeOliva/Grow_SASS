@@ -19,7 +19,8 @@ class TeamRepository
         }
         $now = now();
         $oneWeekAgo = $now->copy()->subWeek();
-        $prompt = "# Informe semanal de {$member->full_name}\n\n";
+        $prompt = "## <u>Informe semanal de {$member->full_name}</u>\n\n";
+        $prompt .= "===============================\n\n";
         // 1️⃣ Completadas
         $completedTasks = $member->assignedTasks()
             ->with([
@@ -80,7 +81,7 @@ class TeamRepository
             $prompt .= "  - Ninguna\n";
         }
         $prompt .= "\n## Alertas Generales\n";
-        $prompt .= "- **No hay tareas en progreso:** " . ($inProgressTasks->count() == 0 ? $member->full_name : 'Ninguna') . "\n";
+        $prompt .= "- **Tareas en progreso:** " . ($inProgressTasks->count() == 0 ? $member->full_name : 'Ninguna') . "\n";
         $bottleneckCount = $overdueTasks->count() + $inProgressTasks->count();
         $prompt .= "- **Cuellos de botella:** " . ($bottleneckCount > 5 ? $member->full_name . " ({$bottleneckCount} tareas)" : 'Ninguna') . "\n";
         return $prompt;
@@ -216,10 +217,30 @@ class TeamRepository
     public function getWeeklyReportAIAnalysis($teamId)
     {
         $prompt = $this->generateMemberWeeklyReportPrompt($teamId);
+
+        /* ---- Prompt “system” mejorado ---- */
+        $systemPrompt = <<<SYS
+            **Rol:** Eres un Scrum Master senior asistido por IA.  
+            **Objetivo:** Analizar la actividad de los últimos **7 días** y generar un **reporte semanal ágil** para el empleado indicado.
+
+            **Instrucciones de salida**  
+            - Formato **Markdown**, máx. 250 palabras.  
+            - Encabezado con nombre del empleado y rango de fechas.  
+            - Secciones obligatorias:  
+            1. **Resumen ejecutivo** (≤ 3 líneas).  
+            2. **Detalle de progreso**  
+                - ✅ Completadas  
+                - 🔄 En progreso  
+                - ⛔ Bloqueadas (indicar causa).  
+            3. **Conclusión & Próximos pasos** (acciones, prioridades, riesgos).  
+            - Usa tono claro, conciso y profesional; verbos en infinitivo (“Revisar”, “Desbloquear”).  
+            - Si una categoría no tiene datos, muestra “—” para mantener la estructura.
+        SYS;
+
         $messages = [
             [
                 'role' => 'system',
-                'content' => 'Eres una IA experta en análisis de desempeño de equipos. Analiza el siguiente informe semanal y proporciona ideas y recomendaciones accionables en un formato breve,claro y profesional.'
+                'content' => $systemPrompt
             ],
             [
                 'role' => 'user',

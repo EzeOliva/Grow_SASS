@@ -379,20 +379,42 @@ class Team extends Controller {
         try {
             $teamId = request('team_id');
             if ($teamId) {
-                $prompt = $this->teamrepo->generateMemberWeeklyReportPrompt($teamId);
+                $prompt = $this->teamrepo->generateMemberWeeklyReportPrompt($teamId);   // ← datos: tareas, alertas, etc.
             } else {
                 $prompt = $this->userrepo->generateTeamWeeklyReportPrompt();
             }
+
+            /* ---- Prompt “system” mejorado ---- */
+            $systemPrompt = <<<SYS
+                **Rol:** Eres un Scrum Master senior asistido por IA.  
+                **Objetivo:** Analizar la actividad de los últimos **7 días** y generar un **reporte semanal ágil** para el empleado indicado.
+
+                **Instrucciones de salida**  
+                - Formato **Markdown**, máx. 250 palabras.  
+                - Encabezado con nombre del empleado y rango de fechas.  
+                - Secciones obligatorias (usa los emojis indicados):  
+                1. **📝 Resumen ejecutivo** (≤ 3 líneas).  
+                2. **🔄 Detalle de progreso** (indica proyecto y cliente si se puede)  
+                    - ✅ Completadas  
+                    - 🔄 En progreso  
+                    - ⛔ Bloqueadas (tareas vencidas hace mucho).  
+                3. **🏁 Conclusión & Próximos pasos** (acciones, prioridades, riesgos).  
+                - Usa tono claro, conciso y profesional; verbos en infinitivo (“Revisar”, “Desbloquear”).  
+                - Si una categoría no tiene datos, muestra “—” para mantener la estructura.
+                SYS;
+
+            /* ---- Mensajes para la llamada a la API ---- */
             $messages = [
                 [
-                    'role' => 'system',
-                    'content' => 'Eres una IA experta en análisis del desempeño de equipos. Analiza el siguiente informe semanal y las alertas generales, y proporciona recomendaciones accionables en un formato breve,claro y profesional.'
+                    'role'    => 'system',
+                    'content' => $systemPrompt
                 ],
                 [
-                    'role' => 'user',
-                    'content' => $prompt
+                    'role'    => 'user',
+                    'content' => $prompt   // ← aquí van las listas de tareas y alertas generadas por tu repo
                 ]
             ];
+
             $aiResponse = $this->callOpenAI($messages);
             $payload = [
                 'aiPrompt' => $prompt,
