@@ -52,6 +52,15 @@ class CreateResponse implements Responsable {
         $jsondata['postrun_functions'][] = [
             'value' => 'NXTaskCreate',
         ];
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initTaskColorHandler',
+        ];
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initModalGoogleMaps',
+        ];
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initLocationAutocomplete',
+        ];
 
         //show modal footer
         $jsondata['dom_visibility'][] = array('selector' => '#commonModalFooter', 'action' => 'show');

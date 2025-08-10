@@ -20,6 +20,69 @@
         </div>
     </div>
 
+    <h5 class="m-t-50">{{ cleanLang(__('lang.optional_task_fields')) }}</h5>
+    <div class="line"></div>
+    <div class="p-b-20">{{ cleanLang(__('lang.optional_task_fields_info')) }}</div>
+
+    <!--enable short title-->
+    <div class="form-group form-group-checkbox row">
+        <label class="col-4 col-form-label">{{ cleanLang(__('lang.short_title')) }}</label>
+        <div class="col-8 p-t-5">
+            <input type="checkbox" id="settings_tasks_short_title" name="settings_tasks_short_title"
+                class="filled-in chk-col-light-blue"
+                {{ runtimePrechecked($settings['settings_tasks_short_title'] ?? '') }}>
+            <label for="settings_tasks_short_title"></label>
+            <small class="form-text text-muted">{{ cleanLang(__('lang.short_title_example')) }}</small>
+        </div>
+    </div>
+
+    <!--enable start time / end time-->
+    <div class="form-group form-group-checkbox row">
+        <label class="col-4 col-form-label">{{ cleanLang(__('lang.start_time')) }} / {{ cleanLang(__('lang.end_time')) }}</label>
+        <div class="col-8 p-t-5">
+            <input type="checkbox" id="settings_tasks_start_end_time" name="settings_tasks_start_end_time"
+                class="filled-in chk-col-light-blue"
+                {{ runtimePrechecked($settings['settings_tasks_start_end_time'] ?? '') }}>
+            <label for="settings_tasks_start_end_time"></label>
+        </div>
+    </div>
+
+    <!--enable estimated time-->
+    <div class="form-group form-group-checkbox row">
+        <label class="col-4 col-form-label">{{ cleanLang(__('lang.estimated_time')) }}</label>
+        <div class="col-8 p-t-5">
+            <input type="checkbox" id="settings_tasks_estimated_time" name="settings_tasks_estimated_time"
+                class="filled-in chk-col-light-blue"
+                {{ runtimePrechecked($settings['settings_tasks_estimated_time'] ?? '') }}>
+            <label for="settings_tasks_estimated_time"></label>
+            <small class="form-text text-muted">{{ cleanLang(__('lang.estimated_time_example')) }}</small>
+        </div>
+    </div>
+
+    <!--enable location-->
+    <div class="form-group form-group-checkbox row">
+        <label class="col-4 col-form-label">{{ cleanLang(__('lang.location')) }}</label>
+        <div class="col-8 p-t-5">
+            <input type="checkbox" id="settings_tasks_location" name="settings_tasks_location"
+                class="filled-in chk-col-light-blue"
+                {{ runtimePrechecked($settings['settings_tasks_location'] ?? '') }}>
+            <label for="settings_tasks_location"></label>
+            <small class="form-text text-muted">{{ cleanLang(__('lang.location_example')) }}</small>
+        </div>
+    </div>
+
+    <!--enable task color-->
+    <div class="form-group form-group-checkbox row">
+        <label class="col-4 col-form-label">{{ cleanLang(__('lang.task_color')) }}</label>
+        <div class="col-8 p-t-5">
+            <input type="checkbox" id="settings_tasks_color" name="settings_tasks_color"
+                class="filled-in chk-col-light-blue"
+                {{ runtimePrechecked($settings['settings_tasks_color'] ?? '') }}>
+            <label for="settings_tasks_color"></label>
+            <small class="form-text text-muted">{{ cleanLang(__('lang.task_color_example')) }}</small>
+        </div>
+    </div>
+
     <h5 class="m-t-50">{{ cleanLang(__('lang.kanban_board_settings')) }}</h5>
     <div class="line"></div>
     <div class="p-b-20">{{ cleanLang(__('lang.kanban_card_front_settings_info')) }}.</div>

@@ -386,6 +386,12 @@ Route::group(['prefix' => 'tasks'], function () {
 
     Route::post('/update-checklist-positions', 'Tasks@updateChecklistPositions');
 
+    // New task field update routes
+    Route::post("/{task}/update-short-title", "Tasks@updateShortTitle")->where('task', '[0-9]+');
+    Route::post("/{task}/update-times", "Tasks@updateTimes")->where('task', '[0-9]+');
+    Route::post("/{task}/update-estimated-time", "Tasks@updateEstimatedTime")->where('task', '[0-9]+');
+    Route::post("/{task}/update-location", "Tasks@updateLocation")->where('task', '[0-9]+');
+    Route::post("/{task}/update-color", "Tasks@updateColor")->where('task', '[0-9]+');
 });
 Route::resource('tasks', 'Tasks');
 
@@ -1395,7 +1401,7 @@ Route::get('/team/analyze-ai/general-alerts', 'Team@analyzeAIGeneralAlerts')->na
 // TEAM AI BASE DATA (non-AI)
 Route::get('/team/analyze-ai/base/weekly-report', 'Team@baseWeeklyReport')->name('team.analyze.ai.base.weekly_report');
 Route::get('/team/analyze-ai/base/general-alerts', 'Team@baseGeneralAlerts')->name('team.analyze.ai.base.general_alerts');
-// TEAM AI ANALYSIS (OpenAI) TABS
+// TEAM AI ANALYSIS (OpenAI)
 Route::get('/team/analyze-ai/ai/weekly-report', 'Team@aiWeeklyReport')->name('team.analyze.ai.ai.weekly_report');
 Route::get('/team/analyze-ai/ai/general-alerts', 'Team@aiGeneralAlerts')->name('team.analyze.ai.ai.general_alerts');
 Route::get('/team/analyze-ai/base/productivity', 'Team@baseProductivity')->name('team.analyze.ai.base.productivity');

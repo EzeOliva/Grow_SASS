@@ -493,7 +493,14 @@ class SettingsRepository {
             return false;
         }
 
-        //update
+        //update optional task fields
+        $settings->settings_tasks_short_title = (request('settings_tasks_short_title') == 'on') ? 'enabled' : 'disabled';
+        $settings->settings_tasks_start_end_time = (request('settings_tasks_start_end_time') == 'on') ? 'enabled' : 'disabled';
+        $settings->settings_tasks_estimated_time = (request('settings_tasks_estimated_time') == 'on') ? 'enabled' : 'disabled';
+        $settings->settings_tasks_location = (request('settings_tasks_location') == 'on') ? 'enabled' : 'disabled';
+        $settings->settings_tasks_color = (request('settings_tasks_color') == 'on') ? 'enabled' : 'disabled';
+
+        //update kanban settings
         $settings->settings_tasks_kanban_date_created = (request('settings_tasks_kanban_date_created') == 'on') ? 'show' : 'hide';
         $settings->settings_tasks_kanban_date_due = (request('settings_tasks_kanban_date_due') == 'on') ? 'show' : 'hide';
         $settings->settings_tasks_kanban_date_start = (request('settings_tasks_kanban_date_start') == 'on') ? 'show' : 'hide';

@@ -451,6 +451,20 @@ class TaskRepository {
         $task->task_position = $position;
         $task->task_calendar_timezone = config('system.settings_system_timezone');
 
+        // New task fields
+        $task->task_short_title = request('task_short_title');
+        $task->task_start_date = request('task_start_date');
+        $task->task_start_time = request('task_start_time');
+        $task->task_end_time = request('task_end_time');
+        
+        // Combine estimated time value and unit
+        $estimatedTimeValue = request('task_estimated_time_value');
+        $estimatedTimeUnit = request('task_estimated_time_unit');
+        $task->task_estimated_time = ($estimatedTimeValue && $estimatedTimeUnit) ? $estimatedTimeValue . $estimatedTimeUnit : null;
+        
+        $task->task_location = request('task_location');
+        $task->task_color = request('task_color');
+
         //fix - march 2025
         $task->taskresource_type = is_numeric(request('task_projectid')) ? 'project' : '';
         $task->task_projectid = is_numeric(request('task_projectid')) ? request('task_projectid') : '';

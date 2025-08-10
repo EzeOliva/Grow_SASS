@@ -5942,227 +5942,979 @@ function NXDeleteExpectationEventInit() {
 }
 
 function NXClientAI() {
-  
+
 }
 
 // Postrun function to convert markdown to HTML for team AI analysis
 function convertTeamAIMarkdown() {
-    $('.ai-analysis-content').each(function() {
-        var $el = $(this);
-        var md = $el.text();
-        var $htmlTarget = $el.siblings('.ai-analysis-html');
-        if (md && typeof marked !== 'undefined' && $htmlTarget.length) {
-            $htmlTarget.html(marked.parse(md));
-        }
-    });
+  $('.ai-analysis-content').each(function () {
+    var $el = $(this);
+    var md = $el.text();
+    var $htmlTarget = $el.siblings('.ai-analysis-html');
+    if (md && typeof marked !== 'undefined' && $htmlTarget.length) {
+      $htmlTarget.html(marked.parse(md));
+    }
+  });
 }
 
 // Postrun function to initialize Team AI modal AI button events only (no tab click handler)
 function initTeamAIModalEvents() {
-    // AI Analysis button click
-    $(document).off('click', '.ai-analyze-btn').on('click', '.ai-analyze-btn', function(e) {
-        e.preventDefault();
-        var $btn = $(this);
-        var url = $btn.data('url');
-        var $result = $btn.closest('.card-body').find('.ai-analysis-result');
-        if (!url || !$result.length) {
-            console.warn('[TeamAI] AI button: URL or .ai-analysis-result not found', url, $result);
-            return;
-        }
-        $result.html('<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin"></i> Generating analysis...</div>');
-        $.ajax({
-            url: url,
-            type: 'GET',
-            dataType: 'json',
-            success: function(response) {
-                if (response.dom_html) {
-                    response.dom_html.forEach(function(dom) {
-                        if (dom.selector && dom.action === 'replace') {
-                            $result.replaceWith(dom.value);
-                            // Debug: check if the selector still exists
-                            if ($(dom.selector).length === 0) {
-                                console.warn('[TeamAI] After AI replace, selector missing:', dom.selector);
-                            }
-                        }
-                    });
-                }
-                if (response.postrun_functions && response.postrun_functions.length) {
-                    response.postrun_functions.forEach(function(fn) {
-                        if (typeof window[fn] === 'function') window[fn]();
-                    });
-                }
-                console.log('[TeamAI] AI analysis loaded:', url);
-            },
-            error: function(xhr) {
-                $result.html('<div class="alert alert-danger">AI analysis failed. Please try again.</div>');
-                console.error('[TeamAI] AI AJAX error:', url, xhr);
-            }
-        });
-    });
-    $('#weekly-report-tab').click();
-    // IMPORTANT: Blade views for AI analysis must always include
-    // the correct containers (class="ai-analysis-result")
-    // after replacement, or future AJAX loads will break.
-}
-
-// ... existing code ...
-function convertLeadAIMarkdown() {
-    $('.ai-analysis-content').each(function() {
-        var $el = $(this);
-        var md = $el.text();
-        var $htmlTarget = $el.siblings('.ai-analysis-html');
-        if (md && typeof marked !== 'undefined' && $htmlTarget.length) {
-            $htmlTarget.html(marked.parse(md));
-        }
-    });
-}
-// ... existing code ...
-
-// Ensure convertLeadAIMarkdown runs after every AJAX load of leads AI modal/tab
-$(document).on('shown.bs.modal', '#basicModal', function() {
-    convertLeadAIMarkdown();
-});
-
-// When a tab is loaded via AJAX, also run convertLeadAIMarkdown
-$(document).on('ajaxComplete', function(event, xhr, settings) {
-    // Only run for leads AI analysis modal/tab loads
-    if (settings.url && settings.url.includes('/leads/analyze-ai/')) {
-        convertLeadAIMarkdown();
-    }
-});
-
-// When the AI result is loaded via the Run AI Analysis button, ensure markdown is converted
-$(document).off('click', '.ai-analyze-btn').on('click', '.ai-analyze-btn', function(e) {
+  // AI Analysis button click
+  $(document).off('click', '.ai-analyze-btn').on('click', '.ai-analyze-btn', function (e) {
     e.preventDefault();
     var $btn = $(this);
     var url = $btn.data('url');
     var $result = $btn.closest('.card-body').find('.ai-analysis-result');
     if (!url || !$result.length) {
-        console.warn('[LeadAI] AI button: URL or .ai-analysis-result not found', url, $result);
-        return;
+      console.warn('[TeamAI] AI button: URL or .ai-analysis-result not found', url, $result);
+      return;
     }
     $result.html('<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin"></i> Generating analysis...</div>');
     $.ajax({
-        url: url,
-        type: 'GET',
-        dataType: 'json',
-        success: function(response) {
-            if (response.dom_html) {
-                response.dom_html.forEach(function(dom) {
-                    if (dom.selector && dom.action === 'replace') {
-                        $result.replaceWith(dom.value);
-                    }
-                });
+      url: url,
+      type: 'GET',
+      dataType: 'json',
+      success: function (response) {
+        if (response.dom_html) {
+          response.dom_html.forEach(function (dom) {
+            if (dom.selector && dom.action === 'replace') {
+              $result.replaceWith(dom.value);
+              // Debug: check if the selector still exists
+              if ($(dom.selector).length === 0) {
+                console.warn('[TeamAI] After AI replace, selector missing:', dom.selector);
+              }
             }
-            // Always run markdown conversion after result is inserted
-            convertLeadAIMarkdown();
-            if (response.postrun_functions && response.postrun_functions.length) {
-                response.postrun_functions.forEach(function(fn) {
-                    if (typeof window[fn] === 'function') window[fn]();
-                });
-            }
-            console.log('[LeadAI] AI analysis loaded:', url);
-        },
-        error: function(xhr) {
-            $result.html('<div class="alert alert-danger">AI analysis failed. Please try again.</div>');
-            console.error('[LeadAI] AI AJAX error:', url, xhr);
+          });
         }
+        if (response.postrun_functions && response.postrun_functions.length) {
+          response.postrun_functions.forEach(function (fn) {
+            if (typeof window[fn] === 'function') window[fn]();
+          });
+        }
+        console.log('[TeamAI] AI analysis loaded:', url);
+      },
+      error: function (xhr) {
+        $result.html('<div class="alert alert-danger">AI analysis failed. Please try again.</div>');
+        console.error('[TeamAI] AI AJAX error:', url, xhr);
+      }
     });
+  });
+  $('#weekly-report-tab').click();
+  // IMPORTANT: Blade views for AI analysis must always include
+  // the correct containers (class="ai-analysis-result")
+  // after replacement, or future AJAX loads will break.
+}
+
+// ... existing code ...
+function convertLeadAIMarkdown() {
+  $('.ai-analysis-content').each(function () {
+    var $el = $(this);
+    var md = $el.text();
+    var $htmlTarget = $el.siblings('.ai-analysis-html');
+    if (md && typeof marked !== 'undefined' && $htmlTarget.length) {
+      $htmlTarget.html(marked.parse(md));
+    }
+  });
+}
+// ... existing code ...
+
+// Ensure convertLeadAIMarkdown runs after every AJAX load of leads AI modal/tab
+$(document).on('shown.bs.modal', '#basicModal', function () {
+  convertLeadAIMarkdown();
 });
 
-$(document).off('click', '.js-ajax-ux-request').on('click', '.js-ajax-ux-request', function(e) {
-    e.stopPropagation();
-    console.log('[DEBUG] .js-ajax-ux-request clicked:', this);
-    // ... existing AJAX/modal logic ...
+// When a tab is loaded via AJAX, also run convertLeadAIMarkdown
+$(document).on('ajaxComplete', function (event, xhr, settings) {
+  // Only run for leads AI analysis modal/tab loads
+  if (settings.url && settings.url.includes('/leads/analyze-ai/')) {
+    convertLeadAIMarkdown();
+  }
+});
+
+// When the AI result is loaded via the Run AI Analysis button, ensure markdown is converted
+$(document).off('click', '.ai-analyze-btn').on('click', '.ai-analyze-btn', function (e) {
+  e.preventDefault();
+  var $btn = $(this);
+  var url = $btn.data('url');
+  var $result = $btn.closest('.card-body').find('.ai-analysis-result');
+  if (!url || !$result.length) {
+    console.warn('[LeadAI] AI button: URL or .ai-analysis-result not found', url, $result);
+    return;
+  }
+  $result.html('<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin"></i> Generating analysis...</div>');
+  $.ajax({
+    url: url,
+    type: 'GET',
+    dataType: 'json',
+    success: function (response) {
+      if (response.dom_html) {
+        response.dom_html.forEach(function (dom) {
+          if (dom.selector && dom.action === 'replace') {
+            $result.replaceWith(dom.value);
+          }
+        });
+      }
+      // Always run markdown conversion after result is inserted
+      convertLeadAIMarkdown();
+      if (response.postrun_functions && response.postrun_functions.length) {
+        response.postrun_functions.forEach(function (fn) {
+          if (typeof window[fn] === 'function') window[fn]();
+        });
+      }
+      console.log('[LeadAI] AI analysis loaded:', url);
+    },
+    error: function (xhr) {
+      $result.html('<div class="alert alert-danger">AI analysis failed. Please try again.</div>');
+      console.error('[LeadAI] AI AJAX error:', url, xhr);
+    }
+  });
+});
+
+$(document).off('click', '.js-ajax-ux-request').on('click', '.js-ajax-ux-request', function (e) {
+  e.stopPropagation();
+  console.log('[DEBUG] .js-ajax-ux-request clicked:', this);
+  // ... existing AJAX/modal logic ...
 });
 
 // ... existing code ...
-$(document).off('click', '.js-ajax-ux-request.js-lead-ai-tab').on('click', '.js-ajax-ux-request.js-lead-ai-tab', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    var $tab = $(this);
-    var url = $tab.data('url');
-    if (!url) return;
-    // Set active class
-    $tab.closest('.nav-tabs').find('.nav-link').removeClass('active');
-    $tab.addClass('active');
-    // Show loading spinner
-    $('#analysis-content').html('<div class="p-3 text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>');
-    // AJAX load tab content
-    $.get(url, function(response) {
-        $('#analysis-content').html(response);
-        if (typeof convertLeadAIMarkdown === 'function') {
-            convertLeadAIMarkdown();
-        }
-    }).fail(function(xhr) {
-        $('#analysis-content').html('<div class="alert alert-danger">Failed to load tab content.</div>');
-    });
+$(document).off('click', '.js-ajax-ux-request.js-lead-ai-tab').on('click', '.js-ajax-ux-request.js-lead-ai-tab', function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  var $tab = $(this);
+  var url = $tab.data('url');
+  if (!url) return;
+  // Set active class
+  $tab.closest('.nav-tabs').find('.nav-link').removeClass('active');
+  $tab.addClass('active');
+  // Show loading spinner
+  $('#analysis-content').html('<div class="p-3 text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>');
+  // AJAX load tab content
+  $.get(url, function (response) {
+    $('#analysis-content').html(response);
+    if (typeof convertLeadAIMarkdown === 'function') {
+      convertLeadAIMarkdown();
+    }
+  }).fail(function (xhr) {
+    $('#analysis-content').html('<div class="alert alert-danger">Failed to load tab content.</div>');
+  });
 });
 // ... existing code ...
 
 // ... existing code ...
 function initLeadAIModalEvents() {
-    // AI Analysis button click
-    $(document).off('click', '.ai-analyze-btn').on('click', '.ai-analyze-btn', function(e) {
-        e.preventDefault();
-        var $btn = $(this);
-        var url = $btn.data('url');
-        var $result = $btn.closest('.card-body').find('.ai-analysis-result');
-        if (!url || !$result.length) {
-            console.warn('[LeadAI] AI button: URL or .ai-analysis-result not found', url, $result);
-            return;
-        }
-        $result.html('<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin"></i> Generating analysis...</div>');
-        $.ajax({
-            url: url,
-            type: 'GET',
-            dataType: 'json',
-            success: function(response) {
-                if (response.dom_html) {
-                    response.dom_html.forEach(function(dom) {
-                        if (dom.selector && dom.action === 'replace') {
-                            $result.replaceWith(dom.value);
-                        }
-                    });
-                }
-                // Always run markdown conversion after result is inserted
-                convertLeadAIMarkdown();
-                if (response.postrun_functions && response.postrun_functions.length) {
-                    response.postrun_functions.forEach(function(fn) {
-                        if (typeof window[fn] === 'function') window[fn]();
-                    });
-                }
-                console.log('[LeadAI] AI analysis loaded:', url);
-            },
-            error: function(xhr) {
-                $result.html('<div class="alert alert-danger">AI analysis failed. Please try again.</div>');
-                console.error('[LeadAI] AI AJAX error:', url, xhr);
-            }
-        });
-    });
-    
-    // Auto-load first tab (Analysis) when modal opens
-    var $firstTab = $('.js-ajax-ux-request.js-lead-ai-tab').first();
-    if ($firstTab.length) {
-        // Set active class on first tab
-        $('.js-ajax-ux-request.js-lead-ai-tab').removeClass('active');
-        $firstTab.addClass('active');
-        
-        // Load first tab content
-        var url = $firstTab.data('url');
-        if (url) {
-            $('#analysis-content').html('<div class="p-3 text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>');
-            $.get(url, function(response) {
-                $('#analysis-content').html(response);
-                if (typeof convertLeadAIMarkdown === 'function') {
-                    convertLeadAIMarkdown();
-                }
-            }).fail(function(xhr) {
-                $('#analysis-content').html('<div class="alert alert-danger">Failed to load tab content.</div>');
-            });
-        }
+  // AI Analysis button click
+  $(document).off('click', '.ai-analyze-btn').on('click', '.ai-analyze-btn', function (e) {
+    e.preventDefault();
+    var $btn = $(this);
+    var url = $btn.data('url');
+    var $result = $btn.closest('.card-body').find('.ai-analysis-result');
+    if (!url || !$result.length) {
+      console.warn('[LeadAI] AI button: URL or .ai-analysis-result not found', url, $result);
+      return;
     }
-    $firstTab.trigger('click');
+    $result.html('<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin"></i> Generating analysis...</div>');
+    $.ajax({
+      url: url,
+      type: 'GET',
+      dataType: 'json',
+      success: function (response) {
+        if (response.dom_html) {
+          response.dom_html.forEach(function (dom) {
+            if (dom.selector && dom.action === 'replace') {
+              $result.replaceWith(dom.value);
+            }
+          });
+        }
+        // Always run markdown conversion after result is inserted
+        convertLeadAIMarkdown();
+        if (response.postrun_functions && response.postrun_functions.length) {
+          response.postrun_functions.forEach(function (fn) {
+            if (typeof window[fn] === 'function') window[fn]();
+          });
+        }
+        console.log('[LeadAI] AI analysis loaded:', url);
+      },
+      error: function (xhr) {
+        $result.html('<div class="alert alert-danger">AI analysis failed. Please try again.</div>');
+        console.error('[LeadAI] AI AJAX error:', url, xhr);
+      }
+    });
+  });
+
+  // Auto-load first tab (Analysis) when modal opens
+  var $firstTab = $('.js-ajax-ux-request.js-lead-ai-tab').first();
+  if ($firstTab.length) {
+    // Set active class on first tab
+    $('.js-ajax-ux-request.js-lead-ai-tab').removeClass('active');
+    $firstTab.addClass('active');
+
+    // Load first tab content
+    var url = $firstTab.data('url');
+    if (url) {
+      $('#analysis-content').html('<div class="p-3 text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>');
+      $.get(url, function (response) {
+        $('#analysis-content').html(response);
+        if (typeof convertLeadAIMarkdown === 'function') {
+          convertLeadAIMarkdown();
+        }
+      }).fail(function (xhr) {
+        $('#analysis-content').html('<div class="alert alert-danger">Failed to load tab content.</div>');
+      });
+    }
+  }
+  $firstTab.trigger('click');
 
 }
 // ... existing code ...
+
+// Google Maps Integration for Task Location
+function initLocationAutocomplete() {
+  console.log('Initializing Google Places Autocomplete...');
+
+  if (typeof google === 'undefined' || !google.maps?.places) {
+    console.log('Google Maps API not loaded yet, loading...');
+    loadGoogleMapsAPI();
+    return;
+  }
+
+  // RIGHT PANEL
+  const rightPanelInput = document.getElementById('task_location');
+  if (rightPanelInput) {
+    console.log('Setting up autocomplete for right panel location input');
+
+    const acRight = new google.maps.places.Autocomplete(rightPanelInput, {
+      // 'geocode' = direcciones. Podés usar 'address' también.
+      types: ['geocode'],
+      fields: ['formatted_address', 'geometry', 'name'],
+      // componentRestrictions: { country: ['AR'] }, // <-- opcional
+    });
+
+    acRight.addListener('place_changed', () => {
+      const place = acRight.getPlace();
+      console.log('Right panel place selected:', place);
+      if (place?.formatted_address) {
+        rightPanelInput.value = place.formatted_address;
+        console.log('Updated right panel input with:', place.formatted_address);
+      }
+    });
+  }
+
+  // MODAL
+  const modalInput = document.getElementById('task_location_input');
+  if (modalInput) {
+    console.log('Setting up autocomplete for modal location input');
+
+    const acModal = new google.maps.places.Autocomplete(modalInput, {
+      types: ['geocode'],
+      fields: ['formatted_address', 'geometry', 'name'],
+      // componentRestrictions: { country: ['AR'] }, // <-- opcional
+    });
+
+    acModal.addListener('place_changed', () => {
+      const place = acModal.getPlace();
+      console.log('Modal place selected:', place);
+      if (place?.formatted_address) {
+        modalInput.value = place.formatted_address;
+        console.log('Updated modal input with:', place.formatted_address);
+      }
+    });
+  }
+}
+
+
+// Load Google Maps API
+function loadGoogleMapsAPI() {
+  if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+    console.log('Loading Google Maps API with Places library...');
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    
+    // Add timeout for API loading
+    const timeout = setTimeout(() => {
+      console.warn('Google Maps API loading timeout - using fallback');
+      initLocationAutocompleteFallback();
+    }, 10000); // 10 second timeout
+    
+    script.onload = function() {
+      clearTimeout(timeout);
+      console.log('Google Maps API loaded successfully');
+      // Wait a bit for the API to fully initialize
+      setTimeout(function() {
+        initLocationAutocomplete();
+      }, 100);
+    };
+    script.onerror = function() {
+      clearTimeout(timeout);
+      console.error('Failed to load Google Maps API - using fallback');
+      initLocationAutocompleteFallback();
+    };
+    document.head.appendChild(script);
+  } else if (typeof google.maps.places === 'undefined') {
+    console.log('Google Maps API loaded but Places library missing, reloading...');
+    // If Maps API is loaded but Places library is missing, reload with Places
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    
+    // Add timeout for API loading
+    const timeout = setTimeout(() => {
+      console.warn('Google Maps API with Places loading timeout - using fallback');
+      initLocationAutocompleteFallback();
+    }, 10000); // 10 second timeout
+    
+    script.onload = function() {
+      clearTimeout(timeout);
+      console.log('Google Maps API with Places library loaded successfully');
+      setTimeout(function() {
+        initLocationAutocomplete();
+      }, 100);
+    };
+    script.onerror = function() {
+      clearTimeout(timeout);
+      console.error('Failed to load Google Maps API with Places - using fallback');
+      initLocationAutocompleteFallback();
+    };
+    document.head.appendChild(script);
+  } else {
+    console.log('Google Maps API already loaded with Places library');
+    initLocationAutocomplete();
+  }
+}
+
+// Initialize Google Maps when task modal is opened
+$(document).on('shown.bs.modal', '#commonModal', function () {
+  if ($('#task_location_input').length) {
+    loadGoogleMapsAPI();
+  }
+});
+
+// Initialize Google Maps when task modal is opened (alternative modal)
+$(document).on('shown.bs.modal', '#cardModal', function () {
+  if ($('#task_location_input').length) {
+    loadGoogleMapsAPI();
+  }
+});
+
+// Task Color Picker and Preset Handler
+function initTaskColorHandler() {
+  console.log('Initializing task color handler for modal...');
+
+  // Use more specific selectors to target only modal elements
+  const colorPicker = $('#commonModal input[name="task_color_custom"], #cardModal input[name="task_color_custom"]');
+  const colorPreset = $('#commonModal #task_color_preset, #cardModal #task_color_preset');
+  const colorFinal = $('#commonModal #task_color_final, #cardModal #task_color_final');
+
+  console.log('Modal color picker found:', colorPicker.length);
+  console.log('Modal color preset found:', colorPreset.length);
+  console.log('Modal color final found:', colorFinal.length);
+  console.log('Initial color picker value:', colorPicker.val());
+  console.log('Initial color preset value:', colorPreset.val());
+
+  // Remove any existing event listeners to prevent duplicates
+  colorPicker.off('change');
+  colorPreset.off('change');
+
+  // When custom color picker changes (modal only)
+  colorPicker.on('change', function () {
+    console.log('Modal color picker changed to:', $(this).val());
+    const selectedColor = $(this).val();
+    colorFinal.val(selectedColor);
+    colorPreset.val(''); // Clear preset selection
+  });
+
+  // When preset dropdown changes (modal only)
+  colorPreset.on('change', function () {
+    console.log('Modal color preset changed to:', $(this).val());
+    const selectedColor = $(this).val();
+    if (selectedColor) {
+      colorFinal.val(selectedColor);
+      // Use simple val() method that was working before
+      colorPicker.val(selectedColor);
+      console.log('Updated modal color picker to:', selectedColor);
+    }
+  });
+
+  console.log('Modal task color handler initialized successfully');
+}
+
+// Initialize color picker for right panel popovers
+function initRightPanelColorHandler() {
+  console.log('Initializing right panel color handler...');
+
+  // Use specific selectors for right panel elements
+  const colorPicker = $('#card-task-colors .popover-body input[name="task_color_custom"]');
+  const colorFinal = $('#card-task-colors .popover-body #task_color_final_right');
+
+  console.log('Right panel color picker found:', colorPicker.length);
+  console.log('Right panel color final found:', colorFinal.length);
+  console.log('Initial color picker value:', colorPicker.val());
+
+  // Remove any existing event listeners to prevent duplicates
+  colorPicker.off('change');
+
+  // When custom color picker changes
+  colorPicker.on('change', function () {
+    console.log('Right panel custom color picker changed to:', $(this).val());
+    const selectedColor = $(this).val();
+    if (colorFinal.length) {
+      colorFinal.val(selectedColor);
+    }
+  });
+
+  console.log('Right panel task color handler initialized successfully');
+}
+
+// Add event handler for when color popover is shown
+$(document).on('shown.bs.popover', '#card-task-color-text', function () {
+  initRightPanelColorHandler();
+});
+
+/**-------------------------------------------------------------
+ * EDITING TASK MILESTONE
+ * ------------------------------------------------------------*/
+$(document).off('click', '#card-tasks-update-milestone-button').on('click', '#card-tasks-update-milestone-button', function () {
+  //update the buttons parent popover
+  $(this).attr('data-form-id', $(this).closest('.popover').attr('id'));
+  //get selected text
+  var $select = $(".popover-body").find("#task_milestoneid");
+  var selected_text = $select.find('option:selected').text();
+  $("#card-task-milestone-title").html(selected_text);
+  //close static popovers
+  $('.js-card-settings-button-static').popover('hide');
+  //send request
+  nxAjaxUxRequest($(this));
+});
+
+/**-------------------------------------------------------------
+ * EDITING TASK SHORT TITLE
+ * ------------------------------------------------------------*/
+$(document).off('click', '#card-tasks-update-short-title-button').on('click', '#card-tasks-update-short-title-button', function () {
+  //update the buttons parent popover
+  $(this).attr('data-form-id', $(this).closest('.popover').attr('id'));
+  //reset data & add loading class
+  var $card_display_element = $("#card-task-short-title-text");
+  $card_display_element.html('---');
+  $card_display_element.addClass('loading');
+  //close static popovers
+  $('.js-card-settings-button-static').popover('hide');
+  //send request
+  nxAjaxUxRequest($(this));
+});
+
+/**-------------------------------------------------------------
+ * EDITING TASK TIMES
+ * ------------------------------------------------------------*/
+$(document).off('click', '#card-tasks-update-times-button').on('click', '#card-tasks-update-times-button', function () {
+  //update the buttons parent popover
+  $(this).attr('data-form-id', $(this).closest('.popover').attr('id'));
+  //reset data & add loading class
+  var $card_display_element = $("#card-task-times-text");
+  $card_display_element.html('--- / ---');
+  $card_display_element.addClass('loading');
+  //close static popovers
+  $('.js-card-settings-button-static').popover('hide');
+  //send request
+  nxAjaxUxRequest($(this));
+});
+
+/**-------------------------------------------------------------
+ * EDITING TASK ESTIMATED TIME
+ * ------------------------------------------------------------*/
+$(document).off('click', '#card-tasks-update-estimated-time-button').on('click', '#card-tasks-update-estimated-time-button', function () {
+  //update the buttons parent popover
+  $(this).attr('data-form-id', $(this).closest('.popover').attr('id'));
+  //reset data & add loading class
+  var $card_display_element = $("#card-task-estimated-time-text");
+  $card_display_element.html('---');
+  $card_display_element.addClass('loading');
+  //close static popovers
+  $('.js-card-settings-button-static').popover('hide');
+  //send request
+  nxAjaxUxRequest($(this));
+});
+
+/**-------------------------------------------------------------
+ * EDITING TASK LOCATION
+ * ------------------------------------------------------------*/
+$(document).off('click', '#card-tasks-update-location-button').on('click', '#card-tasks-update-location-button', function () {
+  //update the buttons parent popover
+  $(this).attr('data-form-id', $(this).closest('.popover').attr('id'));
+  //reset data & add loading class
+  var $card_display_element = $("#card-task-location-text");
+  $card_display_element.html('---');
+  $card_display_element.addClass('loading');
+  //close static popovers
+  $('.js-card-settings-button-static').popover('hide');
+  //send request
+  nxAjaxUxRequest($(this));
+});
+
+/**-------------------------------------------------------------
+ * EDITING TASK COLOR
+ * ------------------------------------------------------------*/
+$(document).off('click', '#card-tasks-update-color-button').on('click', '#card-tasks-update-color-button', function () {
+  //update the buttons parent popover
+  $(this).attr('data-form-id', $(this).closest('.popover').attr('id'));
+
+  // Debug: log the form values
+  console.log('Color update button clicked');
+  console.log('Custom color value:', $('#card-task-colors .popover-body input[name="task_color_custom"]').val());
+  console.log('Preset color value:', $('#card-task-colors .popover-body #task_color_preset_right').val());
+  console.log('Final color value:', $('#card-task-colors .popover-body #task_color_final_right').val());
+  console.log('Button URL:', $(this).attr('data-url'));
+  console.log('Form ID:', $(this).attr('data-form-id'));
+
+  //reset data & add loading class
+  var $card_display_element = $("#card-task-color-text");
+  $card_display_element.html('<span class="color-indicator" style="background-color: #007bff; width: 16px; height: 16px; display: inline-block; border-radius: 3px; margin-right: 5px;"></span>Default');
+  $card_display_element.addClass('loading');
+  //close static popovers
+  $('.js-card-settings-button-static').popover('hide');
+
+  //send request
+  nxAjaxUxRequest($(this));
+});
+
+// Helper function to reliably update HTML color inputs
+function updateColorInput($colorInput, newColor) {
+  console.log("here is the update color function ");
+  if (!$colorInput.length) return;
+
+  // Method 1: Type switching (most reliable)
+  const originalType = $colorInput.attr('type');
+  $colorInput.attr('type', 'text');
+  $colorInput.val(newColor);
+  $colorInput.attr('type', originalType);
+  $colorInput.val(newColor);
+
+  // Method 2: Direct DOM manipulation
+  $colorInput[0].value = newColor;
+  $colorInput[0].dispatchEvent(new Event('change', { bubbles: true }));
+  $colorInput[0].dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Google Maps API Key
+const GOOGLE_MAPS_API_KEY = 'AIzaSyC3QccTr-gz_AF7dcCGSn_BxwtS19O1FMQ';
+
+// Function to show Google Maps for a location
+function showGoogleMaps(location) {
+  if (!location || location.trim() === '') {
+    alert('Please enter a location first.');
+    return;
+  }
+
+  // Encode the location for URL
+  const encodedLocation = encodeURIComponent(location.trim());
+  
+  // Create Google Maps URL
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedLocation}`;
+  
+  // Open in new tab
+  window.open(mapsUrl, '_blank');
+}
+
+// Initialize Google Maps functionality for right panel
+function initRightPanelGoogleMaps() {
+  console.log('Initializing right panel Google Maps...');
+  
+  // Remove existing event listeners
+  $('#show-location-map-btn').off('click');
+  
+  // Add click handler for map button
+  $('#show-location-map-btn').on('click', function() {
+    console.log('Right panel map button clicked');
+    const location = $('#task_location').val();
+    console.log('Location value:', location);
+    showGoogleMaps(location);
+  });
+
+  // Initialize autocomplete for right panel
+  setTimeout(function() {
+    initLocationAutocomplete();
+  }, 200);
+}
+
+// Initialize Google Maps functionality for modal
+function initModalGoogleMaps() {
+  console.log('Initializing modal Google Maps...');
+  
+  // Remove existing event listeners
+  $('#show-location-map-modal-btn').off('click');
+  
+  // Add click handler for map button
+  $('#show-location-map-modal-btn').on('click', function() {
+    console.log('Modal map button clicked');
+    const location = $('#task_location_input').val();
+    console.log('Location value:', location);
+    showGoogleMaps(location);
+  });
+
+  // Initialize autocomplete for modal
+  setTimeout(function() {
+    initLocationAutocomplete();
+  }, 200);
+}
+
+// Document-level event delegation for Google Maps buttons (more robust)
+$(document).on('click', '#show-location-map-btn', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log('Document delegation: Right panel map button clicked');
+  const location = $('#task_location').val();
+  console.log('Location value:', location);
+  showGoogleMaps(location);
+});
+
+$(document).on('click', '#show-location-map-modal-btn', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log('Document delegation: Modal map button clicked');
+  const location = $('#task_location_input').val();
+  console.log('Location value:', location);
+  showGoogleMaps(location);
+});
+
+// Add event handler for when color popover is shown
+$(document).on('shown.bs.popover', '#card-task-color-text', function () {
+  initRightPanelColorHandler();
+});
+
+// Add event handler for when location popover is shown
+$(document).on('shown.bs.popover', '#card-task-location-text', function () {
+  console.log('Location popover shown, initializing Google Maps...');
+  initRightPanelGoogleMaps();
+});
+
+// Add event handler for when modal is shown
+$(document).on('shown.bs.modal', '#commonModal, #cardModal', function () {
+  console.log('Modal shown, initializing Google Maps...');
+  initModalGoogleMaps();
+});
+
+// Also initialize when document is ready
+$(document).ready(function() {
+  console.log('Document ready, checking for Google Maps buttons...');
+  
+  // Check if buttons exist and add handlers
+  if ($('#show-location-map-btn').length) {
+    console.log('Right panel map button found on page load');
+    initRightPanelGoogleMaps();
+  }
+  
+  if ($('#show-location-map-modal-btn').length) {
+    console.log('Modal map button found on page load');
+    initModalGoogleMaps();
+  }
+
+  // Initialize autocomplete for any existing location inputs
+  if ($('#task_location').length || $('#task_location_input').length) {
+    console.log('Location inputs found on page load, initializing autocomplete...');
+    loadGoogleMapsAPI();
+  }
+});
+
+// Initialize autocomplete when new content is loaded via AJAX
+$(document).on('ajaxComplete', function(event, xhr, settings) {
+  // Check if location inputs are present after AJAX load
+  if ($('#task_location').length || $('#task_location_input').length) {
+    console.log('Location inputs found after AJAX load, initializing autocomplete...');
+    setTimeout(function() {
+      initLocationAutocomplete();
+    }, 300);
+  }
+});
+
+// Initialize Google Places Autocomplete for location inputs
+function initLocationAutocomplete() {
+  console.log('Initializing Google Places Autocomplete...');
+
+  if (typeof google === 'undefined' || !google.maps?.places) {
+    console.log('Google Maps API not loaded yet, loading...');
+    loadGoogleMapsAPI();
+    return;
+  }
+
+  // RIGHT PANEL
+  const rightPanelInput = document.getElementById('task_location');
+  if (rightPanelInput) {
+    console.log('Setting up autocomplete for right panel location input');
+
+    const acRight = new google.maps.places.Autocomplete(rightPanelInput, {
+      // 'geocode' = direcciones. Podés usar 'address' también.
+      types: ['geocode'],
+      fields: ['formatted_address', 'geometry', 'name'],
+      // componentRestrictions: { country: ['AR'] }, // <-- opcional
+    });
+
+    acRight.addListener('place_changed', () => {
+      const place = acRight.getPlace();
+      console.log('Right panel place selected:', place);
+      if (place?.formatted_address) {
+        rightPanelInput.value = place.formatted_address;
+        console.log('Updated right panel input with:', place.formatted_address);
+      }
+    });
+  }
+
+  // MODAL
+  const modalInput = document.getElementById('task_location_input');
+  if (modalInput) {
+    console.log('Setting up autocomplete for modal location input');
+
+    const acModal = new google.maps.places.Autocomplete(modalInput, {
+      types: ['geocode'],
+      fields: ['formatted_address', 'geometry', 'name'],
+      // componentRestrictions: { country: ['AR'] }, // <-- opcional
+    });
+
+    acModal.addListener('place_changed', () => {
+      const place = acModal.getPlace();
+      console.log('Modal place selected:', place);
+      if (place?.formatted_address) {
+        modalInput.value = place.formatted_address;
+        console.log('Updated modal input with:', place.formatted_address);
+      }
+    });
+  }
+}
+
+
+// Load Google Maps API with Places library
+function loadGoogleMapsAPI() {
+  if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+    console.log('Loading Google Maps API with Places library...');
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    
+    // Add timeout for API loading
+    const timeout = setTimeout(() => {
+      console.warn('Google Maps API loading timeout - using fallback');
+      initLocationAutocompleteFallback();
+    }, 10000); // 10 second timeout
+    
+    script.onload = function() {
+      clearTimeout(timeout);
+      console.log('Google Maps API loaded successfully');
+      // Wait a bit for the API to fully initialize
+      setTimeout(function() {
+        initLocationAutocomplete();
+      }, 100);
+    };
+    script.onerror = function() {
+      clearTimeout(timeout);
+      console.error('Failed to load Google Maps API - using fallback');
+      initLocationAutocompleteFallback();
+    };
+    document.head.appendChild(script);
+  } else if (typeof google.maps.places === 'undefined') {
+    console.log('Google Maps API loaded but Places library missing, reloading...');
+    // If Maps API is loaded but Places library is missing, reload with Places
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    
+    // Add timeout for API loading
+    const timeout = setTimeout(() => {
+      console.warn('Google Maps API with Places loading timeout - using fallback');
+      initLocationAutocompleteFallback();
+    }, 10000); // 10 second timeout
+    
+    script.onload = function() {
+      clearTimeout(timeout);
+      console.log('Google Maps API with Places library loaded successfully');
+      setTimeout(function() {
+        initLocationAutocomplete();
+      }, 100);
+    };
+    script.onerror = function() {
+      clearTimeout(timeout);
+      console.error('Failed to load Google Maps API with Places - using fallback');
+      initLocationAutocompleteFallback();
+    };
+    document.head.appendChild(script);
+  } else {
+    console.log('Google Maps API already loaded with Places library');
+    initLocationAutocomplete();
+  }
+}
+
+// Fallback autocomplete function when Google Maps API fails
+function initLocationAutocompleteFallback() {
+  console.log('Initializing fallback location autocomplete...');
+  
+  // Initialize fallback for right panel location input
+  const rightPanelInput = document.getElementById('task_location');
+  if (rightPanelInput) {
+    console.log('Setting up fallback autocomplete for right panel location input');
+    setupFallbackAutocomplete(rightPanelInput);
+  }
+
+  // Initialize fallback for modal location input
+  const modalInput = document.getElementById('task_location_input');
+  if (modalInput) {
+    console.log('Setting up fallback autocomplete for modal location input');
+    setupFallbackAutocomplete(modalInput);
+  }
+}
+
+// Setup fallback autocomplete with basic suggestions
+function setupFallbackAutocomplete(input) {
+  // Create a simple dropdown for common locations
+  const dropdown = document.createElement('div');
+  dropdown.className = 'fallback-autocomplete-dropdown';
+  dropdown.style.cssText = `
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 9999;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  `;
+  
+  // Common location suggestions
+  const suggestions = [
+    'New York, NY, USA',
+    'Los Angeles, CA, USA',
+    'Chicago, IL, USA',
+    'Houston, TX, USA',
+    'Phoenix, AZ, USA',
+    'Philadelphia, PA, USA',
+    'San Antonio, TX, USA',
+    'San Diego, CA, USA',
+    'Dallas, TX, USA',
+    'San Jose, CA, USA',
+    'Austin, TX, USA',
+    'Jacksonville, FL, USA',
+    'Fort Worth, TX, USA',
+    'Columbus, OH, USA',
+    'Charlotte, NC, USA',
+    'San Francisco, CA, USA',
+    'Indianapolis, IN, USA',
+    'Seattle, WA, USA',
+    'Denver, CO, USA',
+    'Washington, DC, USA'
+  ];
+  
+  // Create suggestion items
+  suggestions.forEach(suggestion => {
+    const item = document.createElement('div');
+    item.className = 'fallback-suggestion-item';
+    item.style.cssText = `
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+    `;
+    item.textContent = suggestion;
+    
+    item.addEventListener('click', function() {
+      input.value = suggestion;
+      dropdown.style.display = 'none';
+      input.focus();
+    });
+    
+    item.addEventListener('mouseenter', function() {
+      this.style.backgroundColor = '#f8f9fa';
+    });
+    
+    item.addEventListener('mouseleave', function() {
+      this.style.backgroundColor = 'white';
+    });
+    
+    dropdown.appendChild(item);
+  });
+  
+  // Position the dropdown relative to the input
+  const inputContainer = input.parentElement;
+  inputContainer.style.position = 'relative';
+  inputContainer.appendChild(dropdown);
+  
+  // Show/hide dropdown on input focus/blur
+  input.addEventListener('focus', function() {
+    if (this.value.length > 0) {
+      filterSuggestions(this.value, dropdown, suggestions);
+      dropdown.style.display = 'block';
+    }
+  });
+  
+  input.addEventListener('input', function() {
+    filterSuggestions(this.value, dropdown, suggestions);
+    dropdown.style.display = this.value.length > 0 ? 'block' : 'none';
+  });
+  
+  input.addEventListener('blur', function() {
+    // Delay hiding to allow for clicks
+    setTimeout(() => {
+      dropdown.style.display = 'none';
+    }, 200);
+  });
+  
+  // Hide dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!inputContainer.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+}
+
+// Filter suggestions based on input
+function filterSuggestions(query, dropdown, suggestions) {
+  const filtered = suggestions.filter(suggestion => 
+    suggestion.toLowerCase().includes(query.toLowerCase())
+  );
+  
+  // Clear existing items
+  dropdown.innerHTML = '';
+  
+  // Add filtered items
+  filtered.forEach(suggestion => {
+    const item = document.createElement('div');
+    item.className = 'fallback-suggestion-item';
+    item.style.cssText = `
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+    `;
+    item.textContent = suggestion;
+    
+    item.addEventListener('click', function() {
+      const input = dropdown.previousElementSibling;
+      input.value = suggestion;
+      dropdown.style.display = 'none';
+      input.focus();
+    });
+    
+    item.addEventListener('mouseenter', function() {
+      this.style.backgroundColor = '#f8f9fa';
+    });
+    
+    item.addEventListener('mouseleave', function() {
+      this.style.backgroundColor = 'white';
+    });
+    
+    dropdown.appendChild(item);
+  });
+  
+  if (filtered.length === 0) {
+    const noResults = document.createElement('div');
+    noResults.style.cssText = `
+      padding: 8px 12px;
+      color: #666;
+      font-style: italic;
+    `;
+    noResults.textContent = 'No suggestions found';
+    dropdown.appendChild(noResults);
+  }
+}

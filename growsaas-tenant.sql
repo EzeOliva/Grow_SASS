@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 23, 2025 at 06:29 PM
+-- Generation Time: Jul 31, 2025 at 10:06 PM
 -- Server version: 10.4.27-MariaDB
 -- PHP Version: 8.2.0
 
@@ -3207,8 +3207,15 @@ CREATE TABLE `tasks` (
   `task_clientid` int(11) DEFAULT NULL COMMENT 'optional',
   `task_projectid` int(11) DEFAULT NULL COMMENT 'project_id',
   `task_date_start` date DEFAULT NULL,
+  `task_start_date` date DEFAULT NULL,
+  `task_start_time` time DEFAULT NULL,
+  `task_end_time` time DEFAULT NULL,
   `task_date_due` date DEFAULT NULL,
+  `task_estimated_time` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `task_location` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `task_color` varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_title` varchar(250) DEFAULT NULL,
+  `task_short_title` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `task_description` text DEFAULT NULL,
   `task_client_visibility` varchar(100) DEFAULT 'yes',
   `task_milestoneid` int(11) DEFAULT NULL COMMENT 'new tasks must be set to the [uncategorised] milestone',
@@ -5220,6 +5227,16 @@ ALTER TABLE `webhooks`
 ALTER TABLE `webmail_templates`
   MODIFY `webmail_template_id` int(11) NOT NULL AUTO_INCREMENT;
 COMMIT;
+
+--
+-- Add the missing optional task field settings to the settings table
+--
+ALTER TABLE `settings` 
+ADD COLUMN `settings_tasks_short_title` VARCHAR(20) DEFAULT 'disabled' AFTER `settings_tasks_kanban_reminder`,
+ADD COLUMN `settings_tasks_start_end_time` VARCHAR(20) DEFAULT 'disabled' AFTER `settings_tasks_short_title`,
+ADD COLUMN `settings_tasks_estimated_time` VARCHAR(20) DEFAULT 'disabled' AFTER `settings_tasks_start_end_time`,
+ADD COLUMN `settings_tasks_location` VARCHAR(20) DEFAULT 'disabled' AFTER `settings_tasks_estimated_time`,
+ADD COLUMN `settings_tasks_color` VARCHAR(20) DEFAULT 'disabled' AFTER `settings_tasks_location`;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

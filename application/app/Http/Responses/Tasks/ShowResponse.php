@@ -164,6 +164,23 @@ class ShowResponse implements Responsable {
             'value' => 'NXChecklistDragDrop',
         ];
 
+        //initialize task color handler
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initRightSideMenuColorInit',
+        ];
+        //initialize task color handler
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initRightPanelColorHandler',
+        ];
+        //initialize task google maps handler
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initRightPanelGoogleMaps',
+        ];
+        //initialize task location autocomplete
+        $jsondata['postrun_functions'][] = [
+            'value' => 'initLocationAutocomplete',
+        ];
+
         //ajax response
         return response()->json($jsondata);
 

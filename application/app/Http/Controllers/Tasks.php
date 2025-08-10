@@ -3519,22 +3519,369 @@ class Tasks extends Controller {
      */
     public function togglePinning(PinnedRepository $pinrepo, $id) {
 
-        //toggle pin
-        $status = $pinrepo->togglePinned($id, 'task');
+        //get the task
+        $task = $this->taskmodel::findOrFail($id);
+
+        //check permissions
+        if (!$this->taskpermissions->check('edit', $task)) {
+            abort(403);
+        }
+
+        //toggle pinning
+        $pinrepo->togglePinning('task', $id);
+
+        //response
+        return response()->json([
+            'action' => 'pinning',
+            'status' => 'success',
+        ]);
+    }
+
+    /**
+     * update task short title
+     * @param int $id task id
+     * @return \Illuminate\Http\Response
+     */
+    public function updateShortTitle($id) {
 
         //get the task
-        $task = \App\Models\Task::Where('task_id', $id)->first();
+        $task = $this->taskmodel::findOrFail($id);
 
-        //reponse payload
-        $payload = [
-            'task_id' => $id,
-            'task' => $task,
-            'status' => $status,
-        ];
+        //check permissions
+        if (!$this->taskpermissions->check('edit', $task)) {
+            abort(403);
+        }
 
-        //generate a response
-        return new PinningResponse($payload);
+        //validate
+        $validator = Validator::make(request()->all(), [
+            'task_short_title' => 'required|string|max:50',
+        ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ]);
+        }
+
+        //update
+        $task->task_short_title = request('task_short_title');
+        $task->save();
+
+        //response
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Task short title updated successfully',
+            'dom_html' => [
+                [
+                    'selector' => '#card-task-short-title-text',
+                    'action' => 'replace',
+                    'value' => $task->task_short_title ?: '--'
+                ],
+                [
+                    'selector' => '#card-task-short-titles input[name="task_short_title"]',
+                    'action' => 'replace',
+                    'value' => $task->task_short_title
+                ]
+            ],
+            'dom_classes' => [
+                [
+                    'selector' => '#card-task-short-title-text',
+                    'action' => 'remove',
+                    'value' => 'loading'
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * update task start/end times
+     * @param int $id task id
+     * @return \Illuminate\Http\Response
+     */
+    public function updateTimes($id) {
+
+        //get the task
+        $task = $this->taskmodel::findOrFail($id);
+
+        //check permissions
+        if (!$this->taskpermissions->check('edit', $task)) {
+            abort(403);
+        }
+
+        // Debug: log the request data
+        \Log::info('Update times request data:', request()->all());
+
+        //validate
+        $validator = Validator::make(request()->all(), [
+            'task_start_time' => 'nullable|date_format:H:i',
+            'task_end_time' => 'nullable|date_format:H:i',
+        ]);
+
+        // Additional validation: if both times are provided, end time should be after start time
+        if (request('task_start_time') && request('task_end_time')) {
+            $startTime = \Carbon\Carbon::parse(request('task_start_time'));
+            $endTime = \Carbon\Carbon::parse(request('task_end_time'));
+            
+            if ($endTime <= $startTime) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'End time must be after start time',
+                ]);
+            }
+        }
+
+        if ($validator->fails()) {
+            \Log::error('Validation failed:', $validator->errors()->toArray());
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ]);
+        }
+
+        //update
+        $task->task_start_time = request('task_start_time');
+        $task->task_end_time = request('task_end_time');
+        $task->save();
+
+        //format times for display
+        $startTime = $task->task_start_time ? \Carbon\Carbon::parse($task->task_start_time)->format('H:i') : '--';
+        $endTime = $task->task_end_time ? \Carbon\Carbon::parse($task->task_end_time)->format('H:i') : '--';
+
+        //response
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Task times updated successfully', // Use hardcoded message for now
+            'dom_html' => [
+                [
+                    'selector' => '#card-task-times-text',
+                    'action' => 'replace',
+                    'value' => $startTime . ' / ' . $endTime
+                ],
+                [
+                    'selector' => '#card-task-times-popover input[name="task_start_time"]',
+                    'action' => 'replace',
+                    'value' => $task->task_start_time ? \Carbon\Carbon::parse($task->task_start_time)->format('H:i') : ''
+                ],
+                [
+                    'selector' => '#card-task-times-popover input[name="task_end_time"]',
+                    'action' => 'replace',
+                    'value' => $task->task_end_time ? \Carbon\Carbon::parse($task->task_end_time)->format('H:i') : ''
+                ]
+            ],
+            'dom_classes' => [
+                [
+                    'selector' => '#card-task-times-text',
+                    'action' => 'remove',
+                    'value' => 'loading'
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * update task estimated time
+     * @param int $id task id
+     * @return \Illuminate\Http\Response
+     */
+    public function updateEstimatedTime($id) {
+
+        //get the task
+        $task = $this->taskmodel::findOrFail($id);
+
+        //check permissions
+        if (!$this->taskpermissions->check('edit', $task)) {
+            abort(403);
+        }
+
+        //validate
+        $validator = Validator::make(request()->all(), [
+            'task_estimated_time_value' => 'nullable|numeric|min:0',
+            'task_estimated_time_unit' => 'nullable|in:h,d,w',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ]);
+        }
+
+        //combine value and unit only if both are provided
+        $estimatedTime = null;
+        if (request('task_estimated_time_value') && request('task_estimated_time_unit')) {
+            $estimatedTime = request('task_estimated_time_value') . request('task_estimated_time_unit');
+        }
+
+        //update
+        $task->task_estimated_time = $estimatedTime;
+        $task->save();
+
+        //response
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Task estimated time updated successfully',
+            'dom_html' => [
+                [
+                    'selector' => '#card-task-estimated-time-text',
+                    'action' => 'replace',
+                    'value' => $task->task_estimated_time ?: '--'
+                ],
+                [
+                    'selector' => '#card-task-estimated-times input[name="task_estimated_time_value"]',
+                    'action' => 'replace',
+                    'value' => $task->task_estimated_time ? explode('h', explode('d', explode('w', $task->task_estimated_time)[0])[0])[0] : ''
+                ],
+                [
+                    'selector' => '#card-task-estimated-times select[name="task_estimated_time_unit"]',
+                    'action' => 'replace',
+                    'value' => $task->task_estimated_time ? (strpos($task->task_estimated_time, 'h') !== false ? 'h' : (strpos($task->task_estimated_time, 'd') !== false ? 'd' : 'w')) : ''
+                ]
+            ],
+            'dom_classes' => [
+                [
+                    'selector' => '#card-task-estimated-time-text',
+                    'action' => 'remove',
+                    'value' => 'loading'
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * update task location
+     * @param int $id task id
+     * @return \Illuminate\Http\Response
+     */
+    public function updateLocation($id) {
+
+        //get the task
+        $task = $this->taskmodel::findOrFail($id);
+
+        //check permissions
+        if (!$this->taskpermissions->check('edit', $task)) {
+            abort(403);
+        }
+
+        //validate
+        $validator = Validator::make(request()->all(), [
+            'task_location' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ]);
+        }
+
+        //update
+        $task->task_location = request('task_location');
+        $task->save();
+
+        //response
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Task location updated successfully',
+            'dom_html' => [
+                [
+                    'selector' => '#card-task-location-text',
+                    'action' => 'replace',
+                    'value' => $task->task_location ?: '--'
+                ],
+                [
+                    'selector' => '#card-task-locations input[name="task_location"]',
+                    'action' => 'replace',
+                    'value' => $task->task_location
+                ]
+            ],
+            'dom_classes' => [
+                [
+                    'selector' => '#card-task-location-text',
+                    'action' => 'remove',
+                    'value' => 'loading'
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * update task color
+     * @param int $id task id
+     * @return \Illuminate\Http\Response
+     */
+    public function updateColor($id) {
+
+        //get the task
+        $task = $this->taskmodel::findOrFail($id);
+
+        //check permissions
+        if (!$this->taskpermissions->check('edit', $task)) {
+            abort(403);
+        }
+
+        // Debug: log the request data
+        \Log::info('Update color request data:', request()->all());
+
+        //validate
+        $validator = Validator::make(request()->all(), [
+            'task_color_custom' => 'nullable|string|regex:/^#[0-9A-F]{6}$/i',
+        ]);
+
+        if ($validator->fails()) {
+            \Log::error('Color validation failed:', $validator->errors()->toArray());
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ]);
+        }
+
+        //update
+        $task->task_color = request('task_color_custom');
+        $task->save();
+
+        \Log::info('Task color updated successfully:', ['task_id' => $task->task_id, 'new_color' => $task->task_color]);
+
+        //response
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Task color updated successfully',
+            'dom_html' => [
+                [
+                    'selector' => '#card-task-color-text',
+                    'action' => 'replace',
+                    'value' => '<span class="color-indicator" style="background-color: ' . $task->task_color . '; width: 16px; height: 16px; display: inline-block; border-radius: 3px; margin-right: 5px;"></span>' . ($task->task_color ?: 'Default')
+                ],
+                [
+                    'selector' => '#card-task-colors input[name="task_color_custom"]',
+                    'action' => 'replace',
+                    'value' => $task->task_color
+                ],
+                [
+                    'selector' => '#card-task-colors #task_color_preset',
+                    'action' => 'replace',
+                    'value' => $task->task_color
+                ],
+                [
+                    'selector' => '#card_task_' . $task->task_id . ' .task-color-indicator',
+                    'action' => 'replace',
+                    'value' => $task->task_color ? '<div class="task-color-indicator" style="background-color: ' . $task->task_color . ';"></div>' : ''
+                ],
+                [
+                    'selector' => '#card_task_' . $task->task_id,
+                    'action' => 'append',
+                    'value' => $task->task_color ? '<div class="task-color-indicator" style="background-color: ' . $task->task_color . ';"></div>' : '',
+                    'condition' => '!$("#card_task_' . $task->task_id . ' .task-color-indicator").length'
+                ]
+            ],
+            'dom_classes' => [
+                [
+                    'selector' => '#card-task-color-text',
+                    'action' => 'remove',
+                    'value' => 'loading'
+                ]
+            ]
+        ]);
     }
 
     /**

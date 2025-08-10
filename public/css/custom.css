@@ -6,3 +6,62 @@
 .star i.active {
   color: gold;
 }
+
+/* New Task Fields Styling */
+.task-start-info,
+.task-estimated-time,
+.task-location {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+}
+
+.task-start-info i,
+.task-estimated-time i,
+.task-location i {
+  width: 14px;
+  margin-right: 4px;
+}
+
+.task-color-indicator {
+  width: 4px;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 2px 0 0 2px;
+}
+
+.kanban-card {
+  position: relative;
+  border-left: 4px solid transparent;
+}
+
+.kanban-card.has-color {
+  border-left-color: var(--task-color);
+}
+
+.x-new-fields {
+  margin: 8px 0;
+  padding: 0 12px;
+}
+
+.x-new-fields .badge {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+}
+
+.x-new-fields .task-start-info,
+.x-new-fields .task-estimated-time,
+.x-new-fields .task-location {
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+}
+
+.x-new-fields .task-start-info i,
+.x-new-fields .task-estimated-time i,
+.x-new-fields .task-location i {
+  font-size: 0.75rem;
+  margin-right: 6px;
+  opacity: 0.7;
+}

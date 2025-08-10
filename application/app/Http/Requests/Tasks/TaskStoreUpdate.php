@@ -101,6 +101,50 @@ class TaskStoreUpdate extends FormRequest {
                     }
                 },
             ],
+            // New task fields validation
+            'task_short_title' => [
+                'required',
+                'string',
+                'max:50',
+            ],
+            'task_start_date' => [
+                'required',
+                'date',
+            ],
+            'task_start_time' => [
+                'nullable',
+                'date_format:H:i',
+            ],
+            'task_end_time' => [
+                'nullable',
+                'date_format:H:i',
+                function ($attribute, $value, $fail) {
+                    if ($value != '' && request('task_start_time') != '' && (strtotime($value) <= strtotime(request('task_start_time')))) {
+                        return $fail(__('lang.end_time_must_be_after_start_time'));
+                    }
+                },
+            ],
+            'task_estimated_time_value' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+            'task_estimated_time_unit' => [
+                'nullable',
+                'string',
+                'in:h,d,w',
+            ],
+            'task_location' => [
+                'nullable',
+                'string',
+                'max:500',
+            ],
+            'task_color' => [
+                'nullable',
+                'string',
+                'max:7',
+                'regex:/^#[0-9A-F]{6}$/i',
+            ],
         ];
 
         //validate

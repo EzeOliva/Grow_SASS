@@ -26,7 +26,29 @@
             </div>
         </div>
 
+        <!--short title-->
+        @if(config('system.settings_tasks_short_title') == 'enabled')
+        <div class="form-group row">
+            <label
+                class="col-sm-12 col-lg-3 text-left control-label col-form-label required">{{ cleanLang(__('lang.short_title')) }}*</label>
+            <div class="col-sm-12 col-lg-9">
+                <input type="text" class="form-control form-control-sm" name="task_short_title" 
+                       value="{{ $task->task_short_title ?? '' }}" 
+                       placeholder="TM, TN, T1" required>
+            </div>
+        </div>
+        @endif
 
+        <!--start date-->
+        <div class="form-group row">
+            <label
+                class="col-sm-12 col-lg-3 text-left control-label col-form-label required">{{ cleanLang(__('lang.start_date')) }}*</label>
+            <div class="col-sm-12 col-lg-9">
+                <input type="text" class="form-control form-control-sm pickadate" name="task_start_date" 
+                       autocomplete="off" placeholder="" value="{{ $task->task_start_date ?? '' }}" required>
+                <input class="mysql-date" type="hidden" name="task_start_date" id="task_start_date" value="{{ $task->task_start_date ?? '' }}">
+            </div>
+        </div>
 
         @if(config('visibility.task_modal_milestone_option'))
         <div class="form-group row">
@@ -65,9 +87,6 @@
             </div>
         </div>
         @endif
-
-
-
 
         <!--task priority-->
         <div class="form-group row">
@@ -115,8 +134,6 @@
         </div>
         @endif
 
-
-
         <!--assigned [client users]-->
         @if(auth()->user()->role->role_assign_tasks == 'yes' && config('visibility.tasks_standard_features'))
         <div class="form-group row">
@@ -146,7 +163,6 @@
             </div>
         </div>
         @endif
-
 
         <!--CUSTOMER FIELDS [expanded]-->
         @if(config('system.settings_customfields_display_tasks') == 'expanded')
@@ -181,8 +197,6 @@
                 </div>
             </div>
         </div>
-
-
 
         <!--CUSTOMER FIELDS [collapsed]-->
         @if(config('system.settings_customfields_display_tasks') == 'toggled')
@@ -235,6 +249,105 @@
         <!--option toggle-->
         <div class="hidden" id="additional_information_section">
 
+            <!--start time / end time-->
+            @if(config('system.settings_tasks_start_end_time') == 'enabled')
+            <div class="form-group row">
+                <div class="col-sm-12 col-lg-6">
+                    <label class="text-left control-label col-form-label">{{ cleanLang(__('lang.start_time')) }}</label>
+                    <input type="time" class="form-control form-control-sm" name="task_start_time" 
+                           value="{{ $task->task_start_time ?? '' }}">
+                </div>
+                <div class="col-sm-12 col-lg-6">
+                    <label class="text-left control-label col-form-label">{{ cleanLang(__('lang.end_time')) }}</label>
+                    <input type="time" class="form-control form-control-sm" name="task_end_time" 
+                           value="{{ $task->task_end_time ?? '' }}">
+                </div>
+            </div>
+            @endif
+
+            <!--estimated time-->
+            @if(config('system.settings_tasks_estimated_time') == 'enabled')
+            <div class="form-group row">
+                <label
+                    class="col-sm-12 col-lg-3 text-left control-label col-form-label">{{ cleanLang(__('lang.estimated_time')) }}</label>
+                <div class="col-sm-12 col-lg-9">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <input type="number" class="form-control form-control-sm" name="task_estimated_time_value" 
+                                   value="{{ isset($task->task_estimated_time) ? explode(' ', $task->task_estimated_time)[0] ?? '' : '' }}" 
+                                   placeholder="1" min="0" step="0.5">
+                        </div>
+                        <div class="col-sm-6">
+                            <select class="form-control form-control-sm" name="task_estimated_time_unit">
+                                <option value="">{{ cleanLang(__('lang.select_unit')) }}</option>
+                                <option value="h" {{ (isset($task->task_estimated_time) && str_contains($task->task_estimated_time, 'h')) ? 'selected' : '' }}>{{ cleanLang(__('lang.hours')) }}</option>
+                                <option value="d" {{ (isset($task->task_estimated_time) && str_contains($task->task_estimated_time, 'd')) ? 'selected' : '' }}>{{ cleanLang(__('lang.days')) }}</option>
+                                <option value="w" {{ (isset($task->task_estimated_time) && str_contains($task->task_estimated_time, 'w')) ? 'selected' : '' }}>{{ cleanLang(__('lang.weeks')) }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!--location-->
+            @if(config('system.settings_tasks_location') == 'enabled')
+            <div class="form-group row">
+                <label
+                    class="col-sm-12 col-lg-3 text-left control-label col-form-label">{{ cleanLang(__('lang.location')) }}</label>
+                <div class="col-sm-12 col-lg-9">
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-sm" name="task_location" 
+                               value="{{ $task->task_location ?? '' }}" 
+                               placeholder="Enter location or Google Maps address"
+                               id="task_location_input">
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="show-location-map-modal-btn"
+                                title="{{ cleanLang(__('lang.show_on_map')) }}">
+                                <i class="mdi mdi-map-marker"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">{{ cleanLang(__('lang.location_help_text')) }}</small>
+                </div>
+            </div>
+            @endif
+
+            <!--task color-->
+            @if(config('system.settings_tasks_color') == 'enabled')
+            <div class="form-group row">
+                <label
+                    class="col-sm-12 col-lg-3 text-left control-label col-form-label">{{ cleanLang(__('lang.task_color')) }}</label>
+                <div class="col-sm-12 col-lg-9">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <label class="form-label small">{{ cleanLang(__('lang.custom_color')) }}</label>
+                            <input type="color" class="form-control form-control-sm" name="task_color_custom" 
+                                   value="{{ $task->task_color ?? '#007bff' }}" 
+                                   style="height: 38px;">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small">{{ cleanLang(__('lang.default_colors')) }}</label>
+                            <select class="form-control form-control-sm" name="task_color_preset" id="task_color_preset">
+                                <option value="">{{ cleanLang(__('lang.select_color')) }}</option>
+                                <option value="#007bff" {{ (isset($task->task_color) && $task->task_color == '#007bff') ? 'selected' : '' }} style="background-color: #007bff; color: white;">{{ cleanLang(__('lang.blue')) }}</option>
+                                <option value="#28a745" {{ (isset($task->task_color) && $task->task_color == '#28a745') ? 'selected' : '' }} style="background-color: #28a745; color: white;">{{ cleanLang(__('lang.green')) }}</option>
+                                <option value="#ffc107" {{ (isset($task->task_color) && $task->task_color == '#ffc107') ? 'selected' : '' }} style="background-color: #ffc107; color: black;">{{ cleanLang(__('lang.yellow')) }}</option>
+                                <option value="#dc3545" {{ (isset($task->task_color) && $task->task_color == '#dc3545') ? 'selected' : '' }} style="background-color: #dc3545; color: white;">{{ cleanLang(__('lang.red')) }}</option>
+                                <option value="#6f42c1" {{ (isset($task->task_color) && $task->task_color == '#6f42c1') ? 'selected' : '' }} style="background-color: #6f42c1; color: white;">{{ cleanLang(__('lang.purple')) }}</option>
+                                <option value="#fd7e14" {{ (isset($task->task_color) && $task->task_color == '#fd7e14') ? 'selected' : '' }} style="background-color: #fd7e14; color: white;">{{ cleanLang(__('lang.orange')) }}</option>
+                                <option value="#20c997" {{ (isset($task->task_color) && $task->task_color == '#20c997') ? 'selected' : '' }} style="background-color: #20c997; color: white;">{{ cleanLang(__('lang.teal')) }}</option>
+                                <option value="#6c757d" {{ (isset($task->task_color) && $task->task_color == '#6c757d') ? 'selected' : '' }} style="background-color: #6c757d; color: white;">{{ cleanLang(__('lang.gray')) }}</option>
+                                <option value="#e83e8c" {{ (isset($task->task_color) && $task->task_color == '#e83e8c') ? 'selected' : '' }} style="background-color: #e83e8c; color: white;">{{ cleanLang(__('lang.pink')) }}</option>
+                                <option value="#17a2b8" {{ (isset($task->task_color) && $task->task_color == '#17a2b8') ? 'selected' : '' }} style="background-color: #17a2b8; color: white;">{{ cleanLang(__('lang.cyan')) }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <input type="hidden" name="task_color" id="task_color_final" value="{{ $task->task_color ?? '#007bff' }}">
+                </div>
+            </div>
+            @endif
+
             <!--due date-->
             @if(config('visibility.tasks_standard_features'))
             <div class="form-group row">
@@ -247,7 +360,6 @@
                 </div>
             </div>
             @endif
-
 
             <!--tags-->
             <div class="form-group row">
@@ -273,7 +385,6 @@
                     </select>
                 </div>
             </div>
-
 
             <!--[toggled] project options-->
             <div class="toggle_task_type add_task_toggle_container_project">
@@ -344,3 +455,103 @@
         </div>
     </div>
 </div>
+
+<style>
+/* Google Places Autocomplete Styling for Modal */
+.pac-container {
+    z-index: 9999 !important;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.pac-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+}
+
+.pac-item:hover {
+    background-color: #f8f9fa;
+}
+
+.pac-item:last-child {
+    border-bottom: none;
+}
+
+.pac-item-query {
+    font-weight: 500;
+    color: #333;
+}
+
+.pac-matched {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.pac-secondary-text {
+    color: #666;
+    font-size: 12px;
+}
+
+/* New PlaceAutocompleteElement Styling */
+.location-autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+.location-autocomplete-container input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.location-autocomplete-container input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+/* Ensure autocomplete dropdown appears above other elements */
+.location-autocomplete-container .pac-container {
+    z-index: 99999 !important;
+}
+
+/* Fallback Autocomplete Styling */
+.fallback-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 9999;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.fallback-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+}
+
+.fallback-suggestion-item:hover {
+    background-color: #f8f9fa;
+}
+
+.fallback-suggestion-item:last-child {
+    border-bottom: none;
+}
+</style>

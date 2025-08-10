@@ -84,6 +84,11 @@ class contentResponse implements Responsable {
                 'value' => 'NXBootCards',
             ];
 
+            //initialize task color handler
+            $jsondata['postrun_functions'][] = [
+                'value' => 'initRightSideMenuColorInit',
+            ];
+
         }
 
         /** -------------------------------------------------------------------------

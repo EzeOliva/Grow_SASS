@@ -20,6 +20,28 @@ class Task extends Model {
     const UPDATED_AT = 'task_updated';
 
     /**
+     * The attributes that are mass assignable.
+     */
+    protected $fillable = [
+        'task_short_title',
+        'task_start_date',
+        'task_start_time', 
+        'task_end_time',
+        'task_estimated_time',
+        'task_location',
+        'task_color'
+    ];
+
+    /**
+     * The attributes that should be cast.
+     */
+    protected $casts = [
+        'task_start_date' => 'date',
+        'task_start_time' => 'datetime:H:i',
+        'task_end_time' => 'datetime:H:i',
+    ];
+
+    /**
      * relatioship business rules:
      *         - the Project can have many Task
      *         - the Task belongs to one Project

@@ -120,6 +120,9 @@
                 @endif
             </div>
         </div>
+
+        
+
         <div class="x-meta">
             <!--milestone-->
             @if(config('system.settings_tasks_kanban_milestone') == 'show')
@@ -187,6 +190,54 @@
             </div>
             @endif
 
+        </div>
+        <hr class="m-t-5 m-b-5">
+        <!-- New task fields display -->
+        <div class="x-new-fields">
+            <!-- Short Title Badge -->
+            @if(config('system.settings_tasks_short_title') == 'enabled' && $task->task_short_title)
+                <span class="badge badge-secondary mr-2">{{ $task->task_short_title }}</span>
+            @endif
+
+            <!-- Start Date & Time -->
+            @if(config('system.settings_tasks_start_end_time') == 'enabled' && $task->task_start_date)
+                <div class="task-start-info">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>{{ $task->task_start_date ? \Carbon\Carbon::parse($task->task_start_date)->format('M d, Y') : '' }}</span>
+                    @if($task->task_start_time)
+                        <span class="ml-2">{{ $task->task_start_time }}</span>
+                    @endif
+                    @if($task->task_end_time)
+                        <span class="ml-1">- {{ $task->task_end_time }}</span>
+                    @endif
+                </div>
+            @endif
+
+            <!-- Estimated Time -->
+            @if(config('system.settings_tasks_estimated_time') == 'enabled' && $task->task_estimated_time)
+                <div class="task-estimated-time">
+                    <i class="fas fa-clock"></i>
+                    <span>{{ $task->task_estimated_time }}</span>
+                </div>
+            @endif
+
+            <!-- Location -->
+            @if(config('system.settings_tasks_location') == 'enabled' && $task->task_location)
+                <div class="task-location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>{{ $task->task_location }}</span>
+                    @if(str_contains($task->task_location, 'maps.google.com'))
+                        <a href="{{ $task->task_location }}" target="_blank" class="ml-1">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    @endif
+                </div>
+            @endif
+
+            <!-- Task Color Indicator -->
+            @if(config('system.settings_tasks_color') == 'enabled' && $task->task_color)
+                <div class="task-color-indicator" style="background-color: {{ $task->task_color }};"></div>
+            @endif
         </div>
         <div class="x-footer row">
             <div class="col-6 x-icons">
