@@ -103,7 +103,7 @@ class TaskStoreUpdate extends FormRequest {
             ],
             // New task fields validation
             'task_short_title' => [
-                'required',
+                'nullable',
                 'string',
                 'max:50',
             ],
