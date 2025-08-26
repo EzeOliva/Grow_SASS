@@ -717,10 +717,15 @@ Route::group(['prefix'=> 'feedback'], function () {
     Route::delete('/delete/{id}', 'Feedback@destroy')->where('id', '[0-9]+');
     Route::get('/{feedback}/details', [\App\Http\Controllers\Feedback::class, 'details'])
      ->name('feedback.details');
-     
+   
 });
 
-// FEEDBACK
+ Route::post('/feedbacks/{client}/suggest-review',
+    [\App\Http\Controllers\FeedbackAIController::class, 'suggest']
+    )->name('feedbacks.suggest-review')->middleware('throttle:12,1');
+
+
+// expectation
 Route::group(['prefix'=> 'expectation'], function () {
     Route::get('/', 'ClientExpectation@index');
     Route::get('/create/{id}', 'ClientExpectation@create')->where('id', '[0-9]+');
