@@ -48,7 +48,7 @@
     
                 <!-- Comentario -->
                 <div class="form-group">
-                    <label for="comment"><strong>{{ __('lang.comment') }}</strong> <small class="text-muted">({{ __('lang.optional') }})</small></label>
+                    <label for="comment"><strong>{{ __('lang.comment') }}</strong> <small class="text-muted">(Dejanos una reseña 🤗)</small></label>
                     {{-- {{var_dump($feedbackQueries)}} --}}
                     <textarea class="form-control" id="comment" rows="3"></textarea>
                 </div>

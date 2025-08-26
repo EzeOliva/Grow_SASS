@@ -237,10 +237,25 @@
         </td>
         <!--tableconfig_column_28 [status]-->
         <td class="col_status {{ config('table.tableconfig_column_28') }} tableconfig_column_28">
-            <span class="badge badge-{{ $client->health_status == 'green' ? 'success' : ($client->health_status == 'yellow' ? 'warning' : 'danger') }}">
-                {{ ucfirst($client->health_status) }}
+            @php
+                $hs = strtolower($client->health_status ?? '');
+                $emoji = [
+                    'green'  => '🟢',
+                    'yellow' => '🟡',
+                    'red'    => '🔴',
+                ][$hs] ?? '⚪';
+
+                // mantené el color del badge para consistencia visual
+                $badge = $hs === 'green' ? 'success' : ($hs === 'yellow' ? 'warning' : ($hs === 'red' ? 'danger' : 'secondary'));
+                $label = $client->health_status ? ucfirst($client->health_status) : 'N/A';
+            @endphp
+
+            <span class="badge badge-{{ $badge }}" title="{{ $label }}" style="font-size:14px; line-height:1;">
+                {{ $emoji }}
+                <span class="sr-only">{{ $label }}</span>
             </span>
         </td>
+
 
 
         <!--actions-->

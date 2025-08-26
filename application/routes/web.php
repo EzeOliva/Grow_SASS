@@ -715,6 +715,9 @@ Route::group(['prefix'=> 'feedback'], function () {
     Route::put('/edit/{id}', 'Feedback@update')->where('id', '[0-9]+');
     Route::get('/delete', 'Feedback@delete');
     Route::delete('/delete/{id}', 'Feedback@destroy')->where('id', '[0-9]+');
+    Route::get('/{feedback}/details', [\App\Http\Controllers\Feedback::class, 'details'])
+     ->name('feedback.details');
+     
 });
 
 // FEEDBACK

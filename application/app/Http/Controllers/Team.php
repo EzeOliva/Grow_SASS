@@ -24,6 +24,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Validator;
+use App\Models\Lead;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class Team extends Controller {
 
@@ -377,50 +380,252 @@ class Team extends Controller {
     public function analyzeAIWeeklyReport()
     {
         try {
-            $teamId = request('team_id');
+            $teamId     = request('team_id');
+            $oneWeekAgo = now()->copy()->subWeek();
+
             if ($teamId) {
-                $prompt = $this->teamrepo->generateMemberWeeklyReportPrompt($teamId);   // ← datos: tareas, alertas, etc.
+                // Prompt base (tareas, alertas, etc.)
+                $prompt = $this->teamrepo->generateMemberWeeklyReportPrompt($teamId);
+
+                // 0) Detectar columnas de comments (para evitar 1054)
+                $commentUserCol    = Schema::hasColumn('comments','comment_creatorid') ? 'comment_creatorid'
+                                    : (Schema::hasColumn('comments','comment_userid') ? 'comment_userid'
+                                    : (Schema::hasColumn('comments','user_id') ? 'user_id' : null));
+                $commentCreatedCol = Schema::hasColumn('comments','comment_created') ? 'comment_created'
+                                    : (Schema::hasColumn('comments','created_at') ? 'created_at'
+                                    : (Schema::hasColumn('comments','comment_date') ? 'comment_date' : null));
+                $commentTextCol    = Schema::hasColumn('comments','comment_text') ? 'comment_text'
+                                    : (Schema::hasColumn('comments','text') ? 'text' : 'comment');
+
+                // 1) SIEMPRE normalizamos la sección de leads: borramos bloque viejo
+                $prompt = preg_replace(
+                    '/^\s*---\s*\n\s*###\s*Participación en Leads[\s\S]*?(?=^\s*---|\z)/mi',
+                    '',
+                    $prompt
+                );
+
+                // 2) Traemos al miembro
+                $member = \App\Models\User::where('type','team')->where('status','active')->find($teamId);
+
+                // 3) ¿Hay actividad de leads esta semana?
+                $hasLeadActivity =
+                    Lead::where('lead_creatorid', $member->id)
+                        ->where('lead_created', '>=', $oneWeekAgo)->exists()
+                    ||
+                    $member->assignedLeads()
+                        ->where('leads.lead_updated', '>=', $oneWeekAgo)->exists()
+                    ||
+                    $member->assignedLeads()
+                        ->whereNotNull('leads.lead_last_contacted')
+                        ->where('leads.lead_last_contacted', '>=', $oneWeekAgo)->exists()
+                    ||
+                    (($commentUserCol && $commentCreatedCol) ? $member->assignedLeads()
+                        ->whereHas('comments', function ($q) use ($member, $oneWeekAgo, $commentUserCol, $commentCreatedCol) {
+                            $q->where($commentUserCol, $member->id)
+                            ->where($commentCreatedCol, '>=', $oneWeekAgo);
+                        })->exists() : false);
+
+                // 4) Si no hay actividad, inyectamos sección vacía y seguimos
+                if (!$hasLeadActivity) {
+                    $prompt .= "\n---\n### Participación en Leads\n- **Creados:**\n  - —\n- **Asignados con actividad:**\n  - —\n- **Contactados:**\n  - —\n- **Resumen por estado:**\n  - —\n- **Comentarios del miembro:**\n  - —\n";
+                } else {
+                    // 5) Base: empresa/título y join a leads_status
+                    $companyExpr = DB::raw("COALESCE(leads.lead_company_name, leads.lead_title) as lead_company");
+                    $statusTitle = 'leads_status.leadstatus_title as lead_status_title';
+
+                    $baseCols = [
+                        'leads.lead_id',
+                        'leads.lead_firstname',
+                        'leads.lead_lastname',
+                        'leads.lead_status',
+                        'leads.lead_created',
+                        'leads.lead_updated',
+                        'leads.lead_last_contacted',
+                        $companyExpr,
+                        DB::raw($statusTitle),
+                    ];
+
+                    // 5.1 Creados por el miembro
+                    $leadsCreadosSemana = \App\Models\Lead::from('leads')
+                        ->leftJoin('leads_status', 'leads.lead_status', '=', 'leads_status.leadstatus_id')
+                        ->where('lead_creatorid', $member->id)
+                        ->where('lead_created', '>=', $oneWeekAgo)
+                        ->orderBy('lead_created', 'desc')
+                        ->get($baseCols);
+
+                    // 5.2 Asignados con actividad
+                    $leadsAsignadosConActividad = $member->assignedLeads()
+                        ->leftJoin('leads_status', 'leads.lead_status', '=', 'leads_status.leadstatus_id')
+                        ->where('leads.lead_updated', '>=', $oneWeekAgo)
+                        ->orderBy('leads.lead_updated', 'desc')
+                        ->get($baseCols);
+
+                    // 5.3 Contactados esta semana
+                    $leadsContactadosSemana = $member->assignedLeads()
+                        ->leftJoin('leads_status', 'leads.lead_status', '=', 'leads_status.leadstatus_id')
+                        ->whereNotNull('leads.lead_last_contacted')
+                        ->where('leads.lead_last_contacted', '>=', $oneWeekAgo)
+                        ->orderBy('leads.lead_last_contacted', 'desc')
+                        ->get($baseCols);
+
+                    // 5.4 Resumen por estado (por TÍTULO)
+                    $leadsPorEstado = $member->assignedLeads()
+                        ->leftJoin('leads_status', 'leads.lead_status', '=', 'leads_status.leadstatus_id')
+                        ->where('leads.lead_updated', '>=', $oneWeekAgo)
+                        ->groupBy('leads_status.leadstatus_title')
+                        ->selectRaw('leads_status.leadstatus_title as title, COUNT(*) as total')
+                        ->pluck('total','title');
+
+                    // 5.5 Comentarios del miembro (incluye empresa/contacto)
+                    $leadsConComentarios = collect();
+                    $totalComentariosSemana = 0;
+                    if ($commentUserCol && $commentCreatedCol) {
+                        $leadsConComentarios = $member->assignedLeads()
+                            ->leftJoin('leads_status', 'leads.lead_status', '=', 'leads_status.leadstatus_id')
+                            ->withCount(['comments as comments_semana_count' => function ($q) use ($member, $oneWeekAgo, $commentUserCol, $commentCreatedCol) {
+                                $q->where($commentUserCol, $member->id)
+                                ->where($commentCreatedCol, '>=', $oneWeekAgo);
+                            }])
+                            ->with(['comments' => function ($q) use ($member, $oneWeekAgo, $commentUserCol, $commentCreatedCol) {
+                                $q->where($commentUserCol, $member->id)
+                                ->where($commentCreatedCol, '>=', $oneWeekAgo)
+                                ->orderBy($commentCreatedCol, 'desc');
+                            }])
+                            ->orderBy('leads.lead_updated','desc')
+                            ->get($baseCols)
+                            ->filter(fn($l) => (int)($l->comments_semana_count ?? 0) > 0);
+
+                        $totalComentariosSemana = $leadsConComentarios->sum('comments_semana_count');
+                    }
+
+                    // 6) Render ordenado y con títulos
+                    $leadsBlock  = "\n---\n";
+                    $leadsBlock .= "### Participación en Leads\n";
+
+                    $fmtLead = function($l, $tipoFecha) {
+                        $empresa  = $l->lead_company ?? '—';
+                        $contacto = trim(($l->lead_firstname ?? '').' '.($l->lead_lastname ?? ''));
+                        $estado   = $l->lead_status_title ?? ($l->lead_status !== null ? "Estado #{$l->lead_status}" : '—');
+                        $fecha    = $tipoFecha === 'actualizado' ? ($l->lead_updated ?? '')
+                                : ($tipoFecha === 'contacto'   ? ($l->lead_last_contacted ?? '')
+                                                                : ($l->lead_created ?? ''));
+                        $label    = $tipoFecha === 'actualizado' ? 'actualizado'
+                                : ($tipoFecha === 'contacto'   ? 'último contacto' : 'creado');
+                        return "  - #{$l->lead_id} • Empresa: {$empresa} • Contacto: {$contacto} • Estado: {$estado} • {$label}: {$fecha}\n";
+                    };
+
+                    // Creados
+                    $leadsBlock .= "- **Creados:**\n";
+                    if ($leadsCreadosSemana->isEmpty()) {
+                        $leadsBlock .= "  - —\n";
+                    } else {
+                        foreach ($leadsCreadosSemana->take(5) as $l) { $leadsBlock .= $fmtLead($l, 'creado'); }
+                        if ($leadsCreadosSemana->count() > 5) $leadsBlock .= "  - (+".($leadsCreadosSemana->count()-5)." más)\n";
+                    }
+
+                    // Asignados con actividad
+                    $leadsBlock .= "- **Asignados con actividad:**\n";
+                    if ($leadsAsignadosConActividad->isEmpty()) {
+                        $leadsBlock .= "  - —\n";
+                    } else {
+                        foreach ($leadsAsignadosConActividad->take(5) as $l) { $leadsBlock .= $fmtLead($l, 'actualizado'); }
+                        if ($leadsAsignadosConActividad->count() > 5) $leadsBlock .= "  - (+".($leadsAsignadosConActividad->count()-5)." más)\n";
+                    }
+
+                    // Contactados
+                    $leadsBlock .= "- **Contactados:**\n";
+                    if ($leadsContactadosSemana->isEmpty()) {
+                        $leadsBlock .= "  - —\n";
+                    } else {
+                        foreach ($leadsContactadosSemana->take(5) as $l) { $leadsBlock .= $fmtLead($l, 'contacto'); }
+                        if ($leadsContactadosSemana->count() > 5) $leadsBlock .= "  - (+".($leadsContactadosSemana->count()-5)." más)\n";
+                    }
+
+                    // Resumen por estado (por TÍTULO)
+                    $leadsBlock .= "- **Resumen por estado:**\n";
+                    if ($leadsPorEstado && $leadsPorEstado->count()) {
+                        foreach ($leadsPorEstado as $titulo => $total) {
+                            $leadsBlock .= "  - {$titulo}: {$total}\n";
+                        }
+                    } else {
+                        $leadsBlock .= "  - —\n";
+                    }
+
+                    // Comentarios del miembro: Empresa — Contacto — "texto"
+                    $leadsBlock .= "- **Comentarios del miembro:**\n";
+                    if ($totalComentariosSemana <= 0) {
+                        $leadsBlock .= "  - —\n";
+                    } else {
+                        $ultimosTres = $leadsConComentarios
+                            ->flatMap(fn ($lead) => $lead->comments)
+                            ->sortByDesc(fn ($c) => $c->$commentCreatedCol ?? $c->created_at)
+                            ->take(3);
+
+                        foreach ($ultimosTres as $c) {
+                            $leadId  = $c->commentresource_id ?? null;
+                            $leadRef = $leadId ? $leadsConComentarios->firstWhere('lead_id', $leadId) : null;
+                            $empresa = $leadRef->lead_company ?? '—';
+                            $contacto = $leadRef ? trim(($leadRef->lead_firstname ?? '').' '.($leadRef->lead_lastname ?? '')) : '—';
+                            $texto = $c->$commentTextCol ?? '';
+                            if (is_string($texto) && mb_strlen($texto) > 120) $texto = mb_substr($texto, 0, 117).'...';
+                            $cuando = $c->$commentCreatedCol ?? ($c->created_at ?? '');
+                            $leadsBlock .= "  - {$cuando} — {$empresa} — {$contacto} — \"{$texto}\"\n";
+                        }
+                    }
+
+                    // Inyectamos el bloque
+                    $prompt .= $leadsBlock;
+                }
+
             } else {
+                // Reporte general del equipo (sin foco de miembro)
                 $prompt = $this->userrepo->generateTeamWeeklyReportPrompt();
             }
 
             /* ---- Prompt “system” mejorado ---- */
             $systemPrompt = <<<SYS
                 **Rol:** Eres un Scrum Master senior asistido por IA.  
-                **Objetivo:** Analizar la actividad de los últimos **7 días** y generar un **reporte semanal ágil** para el empleado indicado.
+                **Objetivo:** Analizar la actividad de los últimos **7 días** y generar un **reporte semanal ágil**.
 
-                **Instrucciones de salida**  
-                - Formato **Markdown**, máx. 250 palabras.  
-                - Encabezado con nombre del empleado y rango de fechas.  
-                - Secciones obligatorias (usa los emojis indicados):  
-                1. **📝 Resumen ejecutivo** (≤ 3 líneas).  
-                2. **🔄 Detalle de progreso** (indica proyecto y cliente si se puede)  
-                    - ✅ Completadas  
-                    - 🔄 En progreso  
-                    - ⛔ Bloqueadas (tareas vencidas hace mucho).  
-                3. **🏁 Conclusión & Próximos pasos** (acciones, prioridades, riesgos).  
-                - Usa tono claro, conciso y profesional; verbos en infinitivo (“Revisar”, “Desbloquear”).  
-                - Si una categoría no tiene datos, muestra “—” para mantener la estructura.
-                SYS;
+                **Formato de salida (Markdown), máx. 250 palabras.**  
+                Encabezado con nombre del empleado y rango de fechas.
+
+                **Secciones obligatorias (usa exactamente estos títulos y emojis):**
+                1. **📝 Resumen ejecutivo** (≤ 3 líneas).
+                2. **🔄 Detalle de progreso**
+                - ✅ Completadas
+                - 🔄 En progreso
+                - ⛔ Bloqueadas (tareas vencidas hace mucho).
+                3. **📈 Participación en Leads** (mostrar SIEMPRE esta sección; si no hay datos, “—”)
+                - **Creados:** lista hasta **3** en una sola línea cada uno → `ID #, Nombre, Estado, creado: AAAA-MM-DD`.
+                - **Asignados con actividad:** lista hasta **3** → `ID #, Nombre, Estado, actualizado: AAAA-MM-DD hh:mm, último contacto: AAAA-MM-DD` (si existe).
+                - **Comentarios del miembro:** lista hasta **2** → `fecha — Lead — "extracto ≤120 caracteres"`.
+                - **Si hay que recortar por el límite de palabras, prioriza esta sección sobre explicaciones.**
+                4. **🏁 Conclusión & Próximos pasos**
+                - Acciones (bullets concretos).
+                - Prioridades.
+                - Riesgos.
+
+                **Estilo:** claro, conciso y profesional; usa verbos en infinitivo (“Revisar”, “Desbloquear”).  
+                **Regla:** No inventar datos. Solo usar lo provisto en el prompt. Si falta un campo, omitirlo sin rellenar.
+            SYS;
+
 
             /* ---- Mensajes para la llamada a la API ---- */
             $messages = [
-                [
-                    'role'    => 'system',
-                    'content' => $systemPrompt
-                ],
-                [
-                    'role'    => 'user',
-                    'content' => $prompt   // ← aquí van las listas de tareas y alertas generadas por tu repo
-                ]
+                [ 'role' => 'system', 'content' => $systemPrompt ],
+                [ 'role' => 'user',   'content' => $prompt ] // tareas + (potencial) leads
             ];
 
             $aiResponse = $this->callOpenAI($messages);
+
             $payload = [
-                'aiPrompt' => $prompt,
+                'aiPrompt'   => $prompt,
                 'aiAnalysis' => $aiResponse,
             ];
+
             return new \App\Http\Responses\Team\AnalyzeAIWeeklyReportAIResponse($payload);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -428,6 +633,7 @@ class Team extends Controller {
             ]);
         }
     }
+
 
     /**
      * Show the Team AI Analysis modal (AJAX)

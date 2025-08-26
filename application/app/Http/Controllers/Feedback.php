@@ -234,4 +234,16 @@ class Feedback extends Controller
 
         return $page;
     }
+
+    public function details($id)
+    {
+        // (opcional) validar que el feedback pertenezca al cliente autenticado
+        // $this->feedbackRepository->find($id); // o verificación con client_id
+
+        $details = $this->feedbackDetailRepository->getByFeedbackId((int) $id);
+        $html = view('pages/feedback/components/details', compact('details'))->render();
+
+        return response()->json(['success' => true, 'html' => $html]);
+    }
+
 }
