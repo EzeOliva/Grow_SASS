@@ -372,6 +372,7 @@ Route::group(['prefix' => 'tasks'], function () {
     Route::get("/{task}/add-cover-image", "Tasks@addCoverImage")->where('task', '[0-9]+');
     Route::get("/{task}/remove-cover-image", "Tasks@removeCoverImage")->where('task', '[0-9]+');
     Route::get("/{task}/pinning", "Tasks@togglePinning")->where('task', '[0-9]+');
+    Route::post("/{task}/update-billable", "Tasks@updateBillable")->where('task', '[0-9]+');
 
     //card tabs
     Route::get("/content/{task}/show-main", "Tasks@show")->where('lead', '[0-9]+');

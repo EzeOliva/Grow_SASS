@@ -2864,6 +2864,7 @@ return [
     'loading_analysis' => 'Cargando análisis...',
     'feedback' => 'Feedback',
     'expectations' => 'Expectativas',
+    'expectation' => 'Expectativas',
     'projects' => 'Proyectos',
     'comments' => 'Comentarios',
     'ai_analysis' => 'Análisis de IA',

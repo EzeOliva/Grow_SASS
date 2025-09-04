@@ -3989,4 +3989,28 @@ class Tasks extends Controller {
         //return
         return $stats;
     }
+
+    public function updateBillable($task_id)
+    {
+        // buscar tarea
+        $tasks = $this->taskrepo->search($task_id);
+        $task  = $tasks->first();
+
+        // validar valor
+        $value = request('task_billable');
+        if (!in_array($value, ['yes','no'])) {
+            abort(409, __('lang.request_is_invalid'));
+        }
+
+        // guardar
+        $task->task_billable = $value;
+        $task->save();
+
+        // (opcional) payload mínimo para respuestas estándar
+        return new \App\Http\Responses\Tasks\UpdateResponse([
+            'type'         => 'update-billable',
+            'display_text' => ($value === 'yes') ? __('lang.yes') : __('lang.no'),
+            'tasks'        => $tasks,
+        ]);
+    }
 }

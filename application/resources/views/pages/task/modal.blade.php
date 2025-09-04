@@ -38,3 +38,4 @@
 @include('pages.task.components.js-elements')
 
 <script src="public/js/core/card.js?v={{ config('system.versioning') }}"></script>
+
