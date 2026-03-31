@@ -30,6 +30,27 @@
 
 
 <!--text description-->
+<div class="form-group row {{ runtimeVisibilityKBArticle('text', request('category_type')) }}" id="kb-template-options-container">
+    <label class="col-12 text-left control-label col-form-label">Plantilla visual</label>
+    <div class="col-12">
+        <select class="form-control form-control-sm" id="knowledgebase_visual_template" name="knowledgebase_visual_template">
+            <option value="">Sin plantilla (editor libre)</option>
+            <option value="style1">Plantilla 1 · Azul suave</option>
+            <option value="style2">Plantilla 2 · Verde suave</option>
+            <option value="style3">Plantilla 3 · Violeta suave</option>
+        </select>
+        <div class="m-t-8">
+            <label class="m-b-0 cursor-pointer">
+                <input type="checkbox" id="kb_template_include_logo" checked>
+                Incluir bloque de logo + título + texto
+            </label>
+        </div>
+        <div class="m-t-8">
+            <button type="button" class="btn btn-outline-info btn-sm" id="kb-apply-template-btn">Aplicar plantilla</button>
+        </div>
+    </div>
+</div>
+
 <div class="form-group row {{ runtimeVisibilityKBArticle('text', request('category_type')) }}" id="article-text-editor-container">
     <label
         class="col-12 text-left control-label col-form-label required">{{ cleanLang(__('lang.description')) }}*</label>

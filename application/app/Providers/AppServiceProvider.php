@@ -16,7 +16,7 @@ class AppServiceProvider extends ServiceProvider {
     public function boot(UrlGenerator $url) {
 
         //[growcrm] disable debug bar in production mode
-        if (class_exists(\Debugbar::class) && !env('APP_DEBUG_TOOLBAR', false)) {
+        if (!env('APP_DEBUG_TOOLBAR')) {
             \Debugbar::disable();
         }
 
@@ -45,6 +45,25 @@ class AppServiceProvider extends ServiceProvider {
      * @return void
      */
     public function register() {
-        //
+        // Bind the tenant facade
+        $this->app->bind('tenant', function ($app) {
+            if ($app->bound('currentTenant')) {
+                return $app->make('currentTenant');
+            }
+            
+            // Return a default tenant if none is bound
+            $defaultTenant = new \stdClass();
+            $defaultTenant->id = 1;
+            $defaultTenant->tenant_id = 1;
+            $defaultTenant->database = env('TENANT_DB', 'growcrm_tenant_1');
+            $defaultTenant->name = 'Default Tenant';
+            
+            return $defaultTenant;
+        });
+        
+        // Bind the Spatie Tenant class to our custom implementation
+        $this->app->bind(\Spatie\Multitenancy\Models\Tenant::class, function ($app) {
+            return new \App\Models\CustomTenant();
+        });
     }
 }

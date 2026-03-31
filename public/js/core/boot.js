@@ -2,6 +2,33 @@
 
 function NXbootstrap($self, action) {
 
+    //allow TinyMCE dialogs to work inside Bootstrap modals
+    if ($.fn.modal && $.fn.modal.Constructor && $.fn.modal.Constructor.prototype) {
+        var modalProto = $.fn.modal.Constructor.prototype;
+        var nxModalEnforceFocus = function () {
+            var modal = this;
+            $(document)
+                .off('focusin.bs.modal')
+                .on('focusin.bs.modal', function (e) {
+                    if ($(e.target).closest('.tox-tinymce-aux, .tox-dialog, .mce-window, .mce-container, .moxman-window, .tam-assetmanager-root').length) {
+                        return;
+                    }
+                    var modalElement = modal._element || (modal.$element ? modal.$element[0] : null);
+                    if (!modalElement) {
+                        return;
+                    }
+                    if (document !== e.target && modalElement !== e.target && $(modalElement).has(e.target).length === 0) {
+                        modalElement.focus();
+                    }
+                });
+        };
+
+        //bootstrap 4
+        modalProto._enforceFocus = nxModalEnforceFocus;
+        //bootstrap 3 fallback
+        modalProto.enforceFocus = nxModalEnforceFocus;
+    }
+
     //select2 defaults
     $.fn.select2.defaults.set("theme", "bootstrap");
     $.fn.select2.defaults.set("containerCssClass", ":all:");
@@ -547,7 +574,7 @@ function nxTinyMCEBasic(tinyMCEHeight = 300, tinyMCESelector = '.tinymce-textare
         autoresize_min_height: tinyMCEHeight,
         document_base_url: NX.site_url,
         plugins: [
-            "fullscreen image paste link code media autoresize codesample",
+            "fullscreen image paste link autolink code media autoresize codesample",
             "table hr pagebreak toc advlist lists textcolor",
             "imagetools contextmenu colorpicker",
             "spellchecker",
@@ -598,10 +625,14 @@ function nxTinyMCEBasic(tinyMCEHeight = 300, tinyMCESelector = '.tinymce-textare
                 e.stopPropagation();
             });
 
-            // Prevent Bootstrap modal from interfering with TinyMCE dialogs
-            $(document).on('focusin', function (e) {
-                if ($(e.target).closest(".tox-dialog, .tox-tinymce-aux").length) {
-                    e.stopImmediatePropagation();
+            // Prevent Bootstrap modal focus trap from blocking TinyMCE dialog inputs
+            $(document).off('focusin.bs.modal').on('focusin.bs.modal', function (e) {
+                if ($(e.target).closest('.tox-dialog, .tox-tinymce-aux, .mce-window, .mce-container, .moxman-window, .tam-assetmanager-root').length) {
+                    return;
+                }
+                var $activeModal = $('.modal.show').last();
+                if ($activeModal.length && $activeModal[0] !== e.target && !$activeModal.has(e.target).length) {
+                    $activeModal.trigger('focus');
                 }
             });
         }
@@ -1553,8 +1584,6 @@ NX.projectAssignedTasksToggle = function (e, $self) {
 
         //loop through the returned array and create new select option items
         if (data.length > 0) {
-            //var option = '<option value=""></option>';
-            task_dropdown.append(option).trigger('change');
             //enable form fields (for manually recording task time)
             NX.recordTaskTimeToggle('enable');
         } else {

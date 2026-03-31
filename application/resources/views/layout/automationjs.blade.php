@@ -32,7 +32,7 @@
 <!--polling - general data [only when debug mode is disabled, else it resets the debug toolbar]-->
 @if(Auth::user() && env('APP_DEBUG_TOOLBAR') === false)
 <span id="js-trigger-general-polling" class="hidden" data-progress-bar='hidden' data-loading-target="hidden"
-    data-skip-checkboxes-reset="TRUE" data-url="{{ url('polling/general') }}"></span>
+    data-skip-checkboxes-reset="TRUE" data-url="{{ url('api/polling/general') }}"></span>
 @endif
 
 
@@ -41,7 +41,7 @@
 @if(Auth::user() && auth()->user()->is_team && env('APP_DEBUG_TOOLBAR') === false)
 <span id="js-trigger-general-timers" class="hidden" data-type="form" data-progress-bar='hidden' data-notifications="disabled"
     data-skip-checkboxes-reset="TRUE" data-form-id="tasks-view-wrapper" data-ajax-type="post"
-    data-url="{{ url('/polling/timers?ref=list') }}"></span>
+    data-url="{{ url('/api/polling/timers?ref=list') }}"></span>
 @endif
 
 <!--dynamic load - a expense-->

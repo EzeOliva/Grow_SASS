@@ -31,7 +31,7 @@ class IndexResponse implements Responsable {
             $$key = $value;
         }
 
-        $html = view('pages/settings/sections/clients/page', compact('page', 'settings', 'settings2'))->render();
+        $html = view('pages/settings/sections/clients/page', compact('page', 'settings', 'settings2', 'stages'))->render();
 
         $jsondata['dom_html'][] = array(
             'selector' => "#settings-wrapper",

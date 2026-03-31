@@ -6,7 +6,7 @@
             <div class="card bg-primary text-white">
                 <div class="card-body text-center">
                     <h4 class="text-white font-weight-bold">{{ $tasks->count() }}</h4>
-                    <p class="mb-0">Total de tareas</p>
+                    <p class="mb-0">Total Tasks</p>
                 </div>
             </div>
         </div>
@@ -14,7 +14,7 @@
             <div class="card bg-danger text-white">
                 <div class="card-body text-center">
                     <h4 class="text-white font-weight-bold">{{ $overdueTasks->count() }}</h4>
-                    <p class="mb-0">Vencidas</p>
+                    <p class="mb-0">Overdue</p>
                 </div>
             </div>
         </div>
@@ -22,7 +22,7 @@
             <div class="card bg-warning text-white">
                 <div class="card-body text-center">
                     <h4 class="text-white font-weight-bold">{{ $upcomingDeadlines->count() }}</h4>
-                    <p class="mb-0">Vence pronto</p>
+                    <p class="mb-0">Due Soon</p>
                 </div>
             </div>
         </div>
@@ -30,7 +30,7 @@
             <div class="card bg-info text-white">
                 <div class="card-body text-center">
                     <h4 class="text-white font-weight-bold">{{ $criticalTasks->count() }}</h4>
-                    <p class="mb-0">Críticas</p>
+                    <p class="mb-0">Critical</p>
                 </div>
             </div>
         </div>
@@ -39,42 +39,44 @@
     
     <!-- Task Breakdown -->
     <div class="task-breakdown">
-        @if($overdueTasks->count())
+        @if($overdueTasks->count() > 0)
         <div class="card mb-3">
             <div class="card-header bg-danger text-white">
-                <h6><i class="fas fa-exclamation-triangle"></i>
-                    Tareas Vencidas ({{ $overdueTasks->count() }})
-                </h6>
+                <h6><i class="fas fa-exclamation-triangle"></i> Overdue Tasks ({{ $overdueTasks->count() }})</h6>
             </div>
-
             <div class="card-body">
                 <div class="list-group">
                     @foreach($overdueTasks->take(5) as $task)
-                        <div class="list-group-item d-flex justify-content-between">
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="mb-1">{{ $task->task_title }}</h6>
                                 <small class="text-muted">
-                                    Venció: {{ \Carbon\Carbon::parse($task->task_date_due)->format('d M Y') }}
-                                    <span class="badge badge-danger ml-2">
-                                        {{ now()->diffInDays($task->task_date_due, false) * -1 }} días vencidos
-                                    </span>
+                                    Due: {{ $task->task_date_due ? (\Carbon\Carbon::parse($task->task_date_due)->format('M d, Y')) : 'No due date' }}
+                                    @if($task->task_date_due)
+                                        <span class="badge badge-danger ml-2">
+                                            {{ now()->diffInDays($task->task_date_due) }} days overdue
+                                        </span>
+                                    @endif
                                 </small>
                             </div>
-                            <span class="badge badge-{{ $task->task_priority == 'high' ? 'danger' : ($task->task_priority == 'medium' ? 'warning' : 'info') }}">
-                                {{ ucfirst($task->task_priority) }}
-                            </span>
+                            <div>
+                                <span class="badge badge-{{ $task->task_priority == 'high' ? 'danger' : ($task->task_priority == 'medium' ? 'warning' : 'info') }}">
+                                    {{ ucfirst($task->task_priority) }}
+                                </span>
+                            </div>
                         </div>
+                    </div>
                     @endforeach
                 </div>
             </div>
         </div>
-    @endif
-
+        @endif
 
         @if($upcomingDeadlines->count() > 0)
         <div class="card mb-3">
             <div class="card-header bg-warning text-white">
-                <h6><i class="fas fa-clock"></i> Vence Pronto ({{ $upcomingDeadlines->count() }})</h6>
+                <h6><i class="fas fa-clock"></i> Upcoming Deadlines ({{ $upcomingDeadlines->count() }})</h6>
             </div>
             <div class="card-body">
                 <div class="list-group">
@@ -84,10 +86,10 @@
                             <div>
                                 <h6 class="mb-1">{{ $task->task_title }}</h6>
                                 <small class="text-muted">
-                                    Vence: {{ $task->task_date_due ? (\Carbon\Carbon::parse($task->task_date_due)->format('M d, Y')) : 'No hay fecha de vencimiento' }}
+                                    Due: {{ $task->task_date_due ? (\Carbon\Carbon::parse($task->task_date_due)->format('M d, Y')) : 'No due date' }}
                                     @if($task->task_date_due)
                                         <span class="badge badge-warning ml-2">
-                                            Vence en {{ now()->diffInDays($task->task_date_due, false) }} días
+                                            Due in {{ now()->diffInDays($task->task_date_due, false) }} days
                                         </span>
                                     @endif
                                 </small>
@@ -108,7 +110,7 @@
         @if($criticalTasks->count() > 0)
         <div class="card mb-3">
             <div class="card-header bg-info text-white">
-                <h6><i class="fas fa-star"></i> Tareas Críticas ({{ $criticalTasks->count() }})</h6>
+                <h6><i class="fas fa-star"></i> Critical Tasks ({{ $criticalTasks->count() }})</h6>
             </div>
             <div class="card-body">
                 <div class="list-group">
@@ -118,14 +120,14 @@
                             <div>
                                 <h6 class="mb-1">{{ $task->task_title }}</h6>
                                 <small class="text-muted">
-                                    Estado: {{ ucfirst($task->task_status) }}
+                                    Status: {{ ucfirst($task->task_status) }}
                                     @if($task->task_date_due)
-                                        | Vence: {{ $task->task_date_due ? (\Carbon\Carbon::parse($task->task_date_due)->format('M d, Y')) : '' }}
+                                        | Due: {{ $task->task_date_due ? (\Carbon\Carbon::parse($task->task_date_due)->format('M d, Y')) : '' }}
                                     @endif
                                 </small>
                             </div>
                             <div>
-                                <span class="badge badge-danger">Alta Prioridad</span>
+                                <span class="badge badge-danger">High Priority</span>
                             </div>
                         </div>
                     </div>
@@ -139,22 +141,22 @@
     <div class="ai-analysis-section mb-4">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-robot text-primary"></i> Análisis IA</h5>
+                <h5><i class="fas fa-robot text-primary"></i> AI Analysis</h5>
             </div>
             <div class="card-body">
                 <!-- Hide prompt area -->
                 <div class="ai-prompt-area d-none">
                     <textarea class="form-control" rows="8" readonly>{{ $aiPrompt }}</textarea>
-                    <small class="text-muted">Este prompt se enviará a OpenAI para análisis</small>
+                    <small class="text-muted">This prompt will be sent to OpenAI for analysis</small>
                 </div>
                 <div class="mt-3">
                     <button class="btn btn-sm btn-primary ai-analysis-btn" data-toggle="tooltip" data-placement="top" title="Generate AI-powered analysis" onclick="generateAIAnalysis('tasks', {{ $project->project_id }})">
-                        <i class="fas fa-magic"></i> Generar Análisis IA
+                        <i class="fas fa-magic"></i> Generate AI Analysis
                     </button>
                 </div>
                 <div id="ai-response-tasks" class="mt-3" style="display: none;">
                     <div class="alert alert-info">
-                        <i class="fas fa-spinner fa-spin"></i> Generando análisis...
+                        <i class="fas fa-spinner fa-spin"></i> Generating analysis...
                     </div>
                 </div>
             </div>

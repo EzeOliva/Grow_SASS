@@ -46,35 +46,24 @@
             </div>
 
             <div class="card customer-success-block mb-3">
-                @php
-                    $healthLabels = [
-                        'green' => '🟢 Saludable',
-                        'yellow' => '🟡 En riesgo',
-                        'red' => '🔴 Crítico'
-                    ];
-
-                    $healthStatusLabel = $healthLabels[$stats['health_status']] ?? ucfirst($stats['health_status']);
-                @endphp
-
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div>
-                        <i class="fas fa-heart 
-                            @if ($stats['health_status'] === 'green') text-success
-                            @elseif($stats['health_status'] === 'yellow') text-warning
-                            @else text-danger 
-                            @endif mr-2">
-                        </i>
+                        <i
+                            class="fas fa-heart 
+                    @if ($stats['health_status'] === 'green') text-success
+                    @elseif($stats['health_status'] === 'yellow') text-warning
+                    @else text-danger @endif
+                    mr-2"></i>
                         <span>Salud del cliente</span>
                     </div>
-                    <div class="font-weight-bold 
-                        @if ($stats['health_status'] === 'green') text-success
-                        @elseif($stats['health_status'] === 'yellow') text-warning
-                        @else text-danger 
-                        @endif">
-                        {{ $healthStatusLabel }}
+                    <div
+                        class="font-weight-bold
+                    @if ($stats['health_status'] === 'green') text-success
+                    @elseif($stats['health_status'] === 'yellow') text-warning
+                    @else text-danger @endif">
+                        {{ ucfirst($stats['health_status']) }}
                     </div>
                 </div>
-
             </div>
 
         </div>

@@ -23,7 +23,7 @@
            data-toggle="modal" data-target="#basicModal"
            data-url="{{ _url('/projects/'.$project->project_id. "/analyze_ai") }}" data-loading-target="basicModal"
            data-placement="top" title="AI Project Analysis">
-            <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
         </a>
     </td>
     <!--tableconfig_column_2 [project_title]-->

@@ -1715,6 +1715,50 @@ function NXItemCreate() {
  * @description: validation for creating an article
  * -------------------------------------------------------------------------------------*/
 function NXArticleCreate() {
+
+  function kbArticleTemplateHtml(templateKey, includeLogo) {
+    var styles = {
+      style1: {
+        top: '#3b82f6',
+        bg: '#eff6ff',
+        title: '#1e3a8a'
+      },
+      style2: {
+        top: '#10b981',
+        bg: '#ecfdf5',
+        title: '#065f46'
+      },
+      style3: {
+        top: '#8b5cf6',
+        bg: '#f5f3ff',
+        title: '#5b21b6'
+      }
+    };
+
+    var selected = styles[templateKey] || styles.style1;
+
+    var logoBlock = '';
+    if (includeLogo) {
+      logoBlock = '<div style="text-align:center;margin-bottom:18px;">' +
+        '<img src="https://via.placeholder.com/120x120?text=LOGO" alt="Logo" style="max-width:120px;height:auto;margin:0 auto 10px auto;display:block;">' +
+        '<h2 style="margin:0;color:' + selected.title + ';font-size:24px;">Título del artículo</h2>' +
+        '<p style="margin:8px 0 0 0;color:#374151;font-size:14px;">Texto introductorio debajo del título.</p>' +
+        '</div>';
+    }
+
+    return '<div style="border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">' +
+      '<div style="height:14px;background:' + selected.top + ';"></div>' +
+      '<div style="background:' + selected.bg + ';padding:22px;">' +
+      logoBlock +
+      '<div style="background:#ffffff;border-radius:8px;padding:16px;border:1px solid #e5e7eb;">' +
+      '<h3 style="margin-top:0;color:' + selected.title + ';">Subtítulo</h3>' +
+      '<p style="margin-bottom:10px;">Escribí aquí el contenido principal del artículo.</p>' +
+      '<p style="margin-bottom:0;">Podés agregar pasos, enlaces e imágenes desde la barra del editor.</p>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+  }
+
   $("#commonModalForm").validate().destroy();
   $("#commonModalForm").validate({
     rules: {
@@ -1732,12 +1776,14 @@ function NXArticleCreate() {
     //hide all
     $("#article-text-editor-container").hide();
     $("#article-embed-code-container").hide();
+    $("#kb-template-options-container").hide();
 
 
     var selected_type = $(this).find(':selected').attr('data-category-type');
 
     if (selected_type == 'text') {
       $("#article-text-editor-container").show();
+      $("#kb-template-options-container").show();
     }
 
     if (selected_type == 'video') {
@@ -1745,6 +1791,43 @@ function NXArticleCreate() {
     }
 
   });
+
+  //apply visual template in editor
+  $(document).off('click', '#kb-apply-template-btn').on('click', '#kb-apply-template-btn', function () {
+    var templateKey = $('#knowledgebase_visual_template').val();
+    if (templateKey == '') {
+      NX.notification({
+        type: 'info',
+        message: 'Seleccioná una plantilla primero'
+      });
+      return;
+    }
+
+    var includeLogo = $('#kb_template_include_logo').is(':checked');
+    var html = kbArticleTemplateHtml(templateKey, includeLogo);
+    var editor = tinymce.get('knowledgebase_text');
+
+    if (editor) {
+      var current = (editor.getContent() || '').trim();
+      if (current !== '') {
+        if (!confirm('Esto va a reemplazar el contenido actual del editor. ¿Continuar?')) {
+          return;
+        }
+      }
+      editor.setContent(html);
+      editor.save();
+    } else {
+      $('#knowledgebase_text').val(html);
+    }
+  });
+
+  //initial visibility for create/edit modal
+  var initialCategoryType = $('#knowledgebase_categoryid').find(':selected').attr('data-category-type');
+  if (initialCategoryType == 'text' || $('#article-text-editor-container').is(':visible')) {
+    $('#kb-template-options-container').show();
+  } else {
+    $('#kb-template-options-container').hide();
+  }
 
   //we are editong existing article
 

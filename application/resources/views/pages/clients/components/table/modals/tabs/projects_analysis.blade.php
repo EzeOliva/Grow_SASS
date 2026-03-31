@@ -1,51 +1,51 @@
 <div class="projects-analysis">
     <div class="card mb-3">
         <div class="card-header bg-warning text-white">
-            <h6><i class="fas fa-tasks"></i> Plazos de Proyectos</h6>
+            <h6><i class="fas fa-tasks"></i> Project Deadlines</h6>
         </div>
         <div class="card-body">
             @if(count($projectData['overdue']) > 0)
-                <div class="alert alert-danger">Proyectos con plazos vencidos:
+                <div class="alert alert-danger">Overdue projects:
                     <ul>
                         @foreach($projectData['overdue'] as $proj)
-                            <li>{{ $proj->project_title }} (Vence: {{ $proj->project_date_due }})</li>
+                            <li>{{ $proj->project_title }} (Due: {{ $proj->project_date_due }})</li>
                         @endforeach
                     </ul>
                 </div>
             @else
-                <div class="alert alert-success">No hay proyectos con plazos vencidos.</div>
+                <div class="alert alert-success">No overdue projects.</div>
             @endif
             @if(count($projectData['upcoming']) > 0)
-                <div class="alert alert-info">Proyectos con plazos próximos a vencer:
+                <div class="alert alert-info">Projects with upcoming deadlines:
                     <ul>
                         @foreach($projectData['upcoming'] as $proj)
-                            <li>{{ $proj->project_title }} (Vence: {{ $proj->project_date_due }})</li>
+                            <li>{{ $proj->project_title }} (Due: {{ $proj->project_date_due }})</li>
                         @endforeach
                     </ul>
                 </div>
             @else
-                <div class="alert alert-success">No hay proyectos con plazos próximos a vencer.</div>
+                <div class="alert alert-success">No projects with upcoming deadlines.</div>
             @endif
         </div>
     </div>
     <div class="ai-analysis-section mb-4">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-robot text-primary"></i> Análisis IA</h5>
+                <h5><i class="fas fa-robot text-primary"></i> AI Analysis</h5>
             </div>
             <div class="card-body">
                 <div class="ai-prompt-area d-none">
                     <textarea class="form-control" rows="8" readonly>{{ json_encode($projectData) }}</textarea>
-                    <small class="text-muted">Este prompt se enviará a OpenAI para análisis</small>
+                    <small class="text-muted">This prompt will be sent to OpenAI for analysis</small>
                 </div>
                 <div class="mt-3">
                     <button class="btn btn-sm btn-primary ai-analysis-btn" data-toggle="tooltip" data-placement="top" title="Generate AI-powered analysis" onclick="generateAIAnalysis('projects', {{ $client->client_id }})">
-                        <i class="fas fa-magic"></i> Generar Análisis IA
+                        <i class="fas fa-magic"></i> Generate AI Analysis
                     </button>
                 </div>
                 <div id="ai-response-projects" class="mt-3" style="display: none;">
                     <div class="alert alert-info">
-                        <i class="fas fa-spinner fa-spin"></i> Generando análisis...
+                        <i class="fas fa-spinner fa-spin"></i> Generating analysis...
                     </div>
                 </div>
             </div>

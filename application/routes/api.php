@@ -16,3 +16,25 @@ use Illuminate\Http\Request;
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+// Polling endpoints for messages system
+Route::get('/polling/general', function () {
+    return response()->json([
+        'status' => 'success',
+        'data' => [
+            'online_users' => 0,
+            'unread_messages' => 0,
+            'system_status' => 'operational'
+        ]
+    ]);
+});
+
+Route::post('/polling/timers', function (Request $request) {
+    return response()->json([
+        'status' => 'success',
+        'data' => [
+            'timers' => [],
+            'ref' => $request->get('ref', 'list')
+        ]
+    ]);
+});

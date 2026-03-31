@@ -26,3 +26,4 @@ class AnalyzeAIWeeklyReportResponse implements Responsable
     }
 }
 
+ 

@@ -1,3 +1,23 @@
+@php
+    $clientStageOptions = collect([]);
+    $clientStageColorMap = [];
+    $clientStagePastelPalette = [
+        '#FDE2E4', '#FCEEDB', '#FFF7CC', '#E4F9E5', '#DDF4FF',
+        '#E8EAFD', '#F3E8FF', '#FDE4F2', '#E5F4F1', '#ECEFF1',
+    ];
+    if (\Illuminate\Support\Facades\Schema::hasTable('client_stages')) {
+        $clientStageOptions = \App\Models\ClientStage::where('client_stage_active', 'yes')
+            ->orderBy('client_stage_position', 'asc')
+            ->orderBy('client_stage_id', 'asc')
+            ->get();
+
+        foreach ($clientStageOptions as $stageColorItem) {
+            $paletteIndex = ((int) $stageColorItem->client_stage_id) % count($clientStagePastelPalette);
+            $clientStageColorMap[(int) $stageColorItem->client_stage_id] = $clientStagePastelPalette[$paletteIndex];
+        }
+    }
+@endphp
+
 @foreach ($clients as $client)
     <!--each row-->
     <tr id="client_{{ $client->client_id }}" class="{{ $client->pinned_status ?? '' }}">
@@ -8,7 +28,7 @@
             {{ $client->client_id }}
         </td>
 
-        <!--tableconfig_column_29 [AI Analysis Button]-->
+        <!--tableconfig_column_29 [Health Report Button]-->
         @if(config('table.tableconfig_column_29'))
         <td class="clients_analyze_ai {{ config('table.tableconfig_column_29') }} tableconfig_column_29">
             <button type="button"
@@ -16,8 +36,8 @@
                data-toggle="modal" data-target="#basicModal"
                data-url="{{ route('clients.analyze.ai', $client->client_id) }}"
                data-loading-target="basicModal"
-               data-placement="top" title="AI Client Analysis">
-                <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>
+               data-placement="top" title="Informe de Salud del Cliente">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
             </button>
         </td>
         @endif
@@ -25,7 +45,19 @@
         <!--tableconfig_column_2 [client_company_name]-->
         <td class="clients_col_company {{ config('table.tableconfig_column_2') }} tableconfig_column_2"
             id="clients_col_id_{{ $client->client_id }}">
+            @php
+                $isClientActive = in_array(strtolower((string)($client->client_status ?? '')), ['active', 'activo'], true);
+                $showHealthAlertIcon =
+                    $isClientActive
+                    && ((int)($client->expectations_last_3_months_count ?? 0) === 0)
+                    && ((int)($client->feedback_last_3_months_count ?? 0) === 0)
+                    && ((int)($client->minutas_last_3_months_count ?? 0) === 0);
+            @endphp
             <a href="/clients/{{ $client->client_id ?? '' }}">{{ str_limit($client->client_company_name, 35) }}</a>
+            @if($showHealthAlertIcon)
+                <span class="text-danger ml-1" data-toggle="tooltip" data-placement="top"
+                    title="Alerta: sin expectativas, feedback y minutas en los últimos 3 meses">⚠️</span>
+            @endif
         </td>
 
         <!--tableconfig_column_3 [account_owner]-->
@@ -237,25 +269,34 @@
         </td>
         <!--tableconfig_column_28 [status]-->
         <td class="col_status {{ config('table.tableconfig_column_28') }} tableconfig_column_28">
-            @php
-                $hs = strtolower($client->health_status ?? '');
-                $emoji = [
-                    'green'  => '🟢',
-                    'yellow' => '🟡',
-                    'red'    => '🔴',
-                ][$hs] ?? '⚪';
-
-                // mantené el color del badge para consistencia visual
-                $badge = $hs === 'green' ? 'success' : ($hs === 'yellow' ? 'warning' : ($hs === 'red' ? 'danger' : 'secondary'));
-                $label = $client->health_status ? ucfirst($client->health_status) : 'N/A';
-            @endphp
-
-            <span class="badge badge-{{ $badge }}" title="{{ $label }}" style="font-size:14px; line-height:1;">
-                {{ $emoji }}
-                <span class="sr-only">{{ $label }}</span>
+            <span class="badge badge-{{ $client->health_status == 'green' ? 'success' : ($client->health_status == 'yellow' ? 'warning' : 'danger') }}">
+                {{ ucfirst($client->health_status) }}
             </span>
         </td>
 
+        <td class="col_client_stage">
+            <div class="m-b-5">
+                @php
+                    $currentStageId = (int) ($client->client_stage_id ?? 0);
+                    $currentStageColor = $clientStageColorMap[$currentStageId] ?? '#ECEFF1';
+                @endphp
+                <span class="badge js-client-stage-label"
+                    data-stage-id="{{ $currentStageId }}"
+                    style="background-color: {{ $currentStageColor }}; color: #2f3b52; border: 1px solid rgba(47,59,82,.18);">
+                    {{ $client->current_stage_title ?: 'Sin etapa' }}
+                </span>
+            </div>
+            @if(auth()->user()->is_team && $clientStageOptions->count() > 0)
+            <select class="form-control form-control-sm js-client-stage-select" data-client-id="{{ $client->client_id }}">
+                <option value="">Seleccione etapa</option>
+                @foreach($clientStageOptions as $stageOption)
+                <option value="{{ $stageOption->client_stage_id }}"
+                    data-stage-color="{{ $clientStageColorMap[(int) $stageOption->client_stage_id] ?? '#ECEFF1' }}"
+                    {{ (int)($client->client_stage_id ?? 0) === (int)$stageOption->client_stage_id ? 'selected' : '' }}>{{ $stageOption->client_stage_title }}</option>
+                @endforeach
+            </select>
+            @endif
+        </td>
 
 
         <!--actions-->

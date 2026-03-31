@@ -45,7 +45,7 @@
 
 
             <!--RIGHT SIDE-->
-            <ul class="navbar-nav navbar-top-right my-lg-0" id="right-topnav-navbar">
+            <ul class="navbar-nav navbar-top-right my-lg-0" id="right-topnav-navbar" style = "align-items: center">
 
 
 

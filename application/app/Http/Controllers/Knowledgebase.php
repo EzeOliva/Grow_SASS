@@ -22,6 +22,7 @@ use App\Repositories\KnowledgebaseRepository;
 use App\Rules\NoTags;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 use Validator;
 
 class Knowledgebase extends Controller {
@@ -188,33 +189,7 @@ class Knowledgebase extends Controller {
 
         //validate embed code
         if ($category->kbcategory_type == 'video') {
-            //the youtube embed code
-            $embed_code = trim(request('knowledgebase_embed_code'));
-            //empty
-            if (!request()->filled('knowledgebase_embed_code')) {
-                abort(409, __('lang.youtube_embed_code') . ' - ' . __('lang.is_required'));
-            }
-
-            //ensure it looks like a valie embed code (BNS Regex - 22 Aug 2021)
-            if (!preg_match('%^<iframe width="[1-9][0-9][0-9]".height="[1-9][0-9][0-9].*src="https://.*youtube.*/embed/.*</iframe>$%', $embed_code)) {
-                abort(409, __('lang.invalid_youtube_embed_code'));
-            }
-
-            //get video id from the embed code (BNS Regex - 22 Aug 2021)
-            if (preg_match('%^<iframe width="[1-9][0-9][0-9]".height="[1-9][0-9][0-9].*src="https://.*youtube.*/embed/(.*?)".*</iframe>$%', $embed_code, $regs)) {
-                $video_id = $regs[1];
-                if ($video_id == '') {
-                    abort(409, __('lang.error_processing_embed_code'));
-                }
-            } else {
-                abort(409, __('lang.error_processing_embed_code'));
-            }
-
-            //merge video data
-            request()->merge([
-                'knowledgebase_embed_video_id' => $video_id,
-                'knowledgebase_embed_thumb' => 'https://img.youtube.com/vi/' . $video_id . '/hqdefault.jpg',
-            ]);
+            $this->prepareVideoEmbedData();
         }
 
         //create the foo
@@ -357,33 +332,7 @@ class Knowledgebase extends Controller {
 
         //validate embed code
         if ($category->kbcategory_type == 'video') {
-            //the youtube embed code
-            $embed_code = trim(request('knowledgebase_embed_code'));
-            //empty
-            if (!request()->filled('knowledgebase_embed_code')) {
-                abort(409, __('lang.youtube_embed_code') . ' - ' . __('lang.is_required'));
-            }
-
-            //ensure it looks like a valie embed code (BNS Regex - 22 Aug 2021)
-            if (!preg_match('%^<iframe width="[1-9][0-9][0-9]".height="[1-9][0-9][0-9].*src="https://.*youtube.*/embed/.*</iframe>$%', $embed_code)) {
-                abort(409, __('lang.invalid_youtube_embed_code'));
-            }
-
-            //get video id from the embed code (BNS Regex - 22 Aug 2021)
-            if (preg_match('%^<iframe width="[1-9][0-9][0-9]".height="[1-9][0-9][0-9].*src="https://.*youtube.*/embed/(.*?)".*</iframe>$%', $embed_code, $regs)) {
-                $video_id = $regs[1];
-                if ($video_id == '') {
-                    abort(409, __('lang.error_processing_embed_code'));
-                }
-            } else {
-                abort(409, __('lang.error_processing_embed_code'));
-            }
-
-            //merge video data
-            request()->merge([
-                'knowledgebase_embed_video_id' => $video_id,
-                'knowledgebase_embed_thumb' => 'https://img.youtube.com/vi/' . $video_id . '/hqdefault.jpg',
-            ]);
+            $this->prepareVideoEmbedData();
         }
 
         //update article
@@ -522,5 +471,104 @@ class Knowledgebase extends Controller {
 
         //return
         return $page;
+    }
+
+    /**
+     * Validate and normalize YouTube embed input (iframe or URL)
+     *
+     * @return void
+     */
+    private function prepareVideoEmbedData() {
+
+        $input = trim((string) request('knowledgebase_embed_code'));
+
+        if ($input == '') {
+            abort(409, __('lang.youtube_embed_code') . ' - ' . __('lang.is_required'));
+        }
+
+        if (!$video_id = $this->extractYoutubeVideoId($input)) {
+            abort(409, __('lang.invalid_youtube_embed_code'));
+        }
+
+        $embed_url = 'https://www.youtube.com/embed/' . $video_id;
+
+        request()->merge([
+            'knowledgebase_embed_video_id' => $video_id,
+            'knowledgebase_embed_thumb' => 'https://img.youtube.com/vi/' . $video_id . '/hqdefault.jpg',
+            'knowledgebase_embed_code' => '<iframe width="560" height="315" src="' . $embed_url . '" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>',
+        ]);
+    }
+
+    /**
+     * Extract YouTube video id from iframe code or url
+     *
+     * @param string $input
+     * @return string|null
+     */
+    private function extractYoutubeVideoId($input = '') {
+
+        $candidate = trim((string) $input);
+
+        //extract iframe src when HTML was provided
+        if (preg_match('/<iframe[^>]*src=["\']([^"\']+)["\'][^>]*>/i', $candidate, $matches)) {
+            $candidate = trim($matches[1]);
+        }
+
+        if ($candidate == '') {
+            return null;
+        }
+
+        //allow protocol-relative urls
+        if (Str::startsWith($candidate, '//')) {
+            $candidate = 'https:' . $candidate;
+        }
+
+        $parts = parse_url($candidate);
+        if (!$parts || empty($parts['host'])) {
+            return null;
+        }
+
+        $host = strtolower($parts['host']);
+        if (Str::startsWith($host, 'www.')) {
+            $host = substr($host, 4);
+        }
+
+        $video_id = null;
+
+        //youtu.be/<id>
+        if ($host == 'youtu.be') {
+            $path = trim($parts['path'] ?? '', '/');
+            $video_id = $path;
+        }
+
+        //youtube.com variations
+        if (in_array($host, ['youtube.com', 'm.youtube.com', 'youtube-nocookie.com'])) {
+            $path = trim($parts['path'] ?? '', '/');
+
+            if (Str::startsWith($path, 'embed/')) {
+                $video_id = trim(substr($path, strlen('embed/')), '/');
+            } elseif (Str::startsWith($path, 'shorts/')) {
+                $video_id = trim(substr($path, strlen('shorts/')), '/');
+            } elseif (Str::startsWith($path, 'live/')) {
+                $video_id = trim(substr($path, strlen('live/')), '/');
+            } elseif (($parts['path'] ?? '') == '/watch') {
+                parse_str($parts['query'] ?? '', $query);
+                $video_id = $query['v'] ?? null;
+            }
+        }
+
+        //sanitize id
+        $video_id = trim((string) $video_id);
+        if ($video_id == '') {
+            return null;
+        }
+
+        $video_id = preg_split('/[?&#]/', $video_id)[0];
+
+        if (!preg_match('/^[A-Za-z0-9_-]{6,20}$/', $video_id)) {
+            return null;
+        }
+
+        return $video_id;
     }
 }

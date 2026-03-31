@@ -309,7 +309,7 @@ class TaskRepository {
             //filter by a specified user's assigned tasks
             if (request()->filled('filter_users_tasks') && request()->filled('filter_users_tasks_user_id')) {
                 $tasks->whereHas('assigned', function ($query) {
-                    $query->whereIn('tasksassigned_userid', [filled('filter_users_tasks_user_id')]);
+                    $query->whereIn('tasksassigned_userid', [request('filter_users_tasks_user_id')]);
                 });
             }
         }

@@ -1,49 +1,49 @@
 <div class="modal-dialog modal-lg" id="basicModalContainer">
   <div class="modal-content">
     <div class="modal-header" id="basicModalHeader">
-      <h3 class="modal-title"><i class="fas fa-wand-magic-sparkles text-warning mr-2"></i><span>{{ cleanLang(__('lang.ai_client_analysis')) }} - {{ $client->client_company_name ?? cleanLang(__('lang.client')) }}</span></h3>
+      <h3 class="modal-title"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Informe de Salud del Cliente - {{ $client->client_company_name ?? cleanLang(__('lang.client')) }}</span></h3>
       <button type="button" class="close" data-dismiss="modal" id="basicModalCloseIcon">
           <i class="ti-close"></i>
       </button>
     </div>
     <div class="modal-body" id="basicModalBody">
       <div class="container">
-        <!-- Analysis Type Tabs -->
+          <!-- Health Report Tabs -->
         <ul class="nav nav-tabs" id="aiAnalysisTabs" role="tablist">
           <li class="nav-item">
-            <a class="nav-link active js-ajax-ux-request" id="feedback-tab" data-toggle="tab" href="#analysis-content" role="tab"
-               data-url="{{ route('clients.analyze.ai.feedback', $client->client_id) }}"
+            <a class="nav-link active js-ajax-ux-request" id="week-tab" data-toggle="tab" href="#analysis-content" role="tab"
+              data-url="{{ route('clients.analyze.ai.health', ['client' => $client->client_id, 'period' => 'week']) }}"
                data-ajax-type="GET"
                data-loading-target="analysis-content"
                data-loading-class="loading">
-               <i class="fas fa-comments"></i> {{ cleanLang(__('lang.feedback')) }}
+              Última semana
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link js-ajax-ux-request" id="expectations-tab" data-toggle="tab" href="#analysis-content" role="tab"
-               data-url="{{ route('clients.analyze.ai.expectations', $client->client_id) }}"
+            <a class="nav-link js-ajax-ux-request" id="month-tab" data-toggle="tab" href="#analysis-content" role="tab"
+              data-url="{{ route('clients.analyze.ai.health', ['client' => $client->client_id, 'period' => 'month']) }}"
                data-ajax-type="GET"
                data-loading-target="analysis-content"
                data-loading-class="loading">
-               <i class="fas fa-bullseye"></i> {{ cleanLang(__('lang.expectations')) }}
+              Último mes
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link js-ajax-ux-request" id="projects-tab" data-toggle="tab" href="#analysis-content" role="tab"
-               data-url="{{ route('clients.analyze.ai.projects', $client->client_id) }}"
+            <a class="nav-link js-ajax-ux-request" id="quarter-tab" data-toggle="tab" href="#analysis-content" role="tab"
+              data-url="{{ route('clients.analyze.ai.health', ['client' => $client->client_id, 'period' => 'quarter']) }}"
                data-ajax-type="GET"
                data-loading-target="analysis-content"
                data-loading-class="loading">
-               <i class="fas fa-tasks"></i> {{ cleanLang(__('lang.projects')) }}
+              Último trimestre
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link js-ajax-ux-request" id="comments-tab" data-toggle="tab" href="#analysis-content" role="tab"
-               data-url="{{ route('clients.analyze.ai.comments', $client->client_id) }}"
+            <a class="nav-link js-ajax-ux-request" id="meeting-prep-tab" data-toggle="tab" href="#analysis-content" role="tab"
+              data-url="{{ route('clients.analyze.ai.meeting.prep', ['client' => $client->client_id]) }}"
                data-ajax-type="GET"
                data-loading-target="analysis-content"
                data-loading-class="loading">
-               <i class="fas fa-question-circle"></i> {{ cleanLang(__('lang.comments')) }}
+              Preparemos una reunión
             </a>
           </li>
         </ul>
@@ -54,7 +54,7 @@
               <div class="spinner-border text-primary" role="status">
                 <span class="sr-only">{{ cleanLang(__('lang.loading')) }}</span>
               </div>
-              <p class="mt-2">{{ cleanLang(__('lang.analyzing_client_feedback')) }}</p>
+              <p class="mt-2">Cargando informe de salud del cliente...</p>
             </div>
           </div>
         </div>
@@ -64,8 +64,8 @@
 </div>
 <script>
 $(document).ready(function() {
-    // Load initial feedback analysis
-    var initialTab = $('#feedback-tab');
+    // Load initial week health report
+    var initialTab = $('#week-tab');
     if (initialTab.length > 0) {
         nxAjaxUxRequest(initialTab);
     }
@@ -83,7 +83,7 @@ $(document).ready(function() {
                 <div class="spinner-border text-primary" role="status">
                     <span class="sr-only">${cleanLang(__('lang.loading'))}</span>
                 </div>
-                <p class="mt-2">${cleanLang(__('lang.loading_analysis'))}</p>
+                  <p class="mt-2">Cargando informe...</p>
             </div>
         `);
         // Trigger AJAX request

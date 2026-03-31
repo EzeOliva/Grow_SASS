@@ -14,10 +14,10 @@
                                         class="sorting-icons"><i class="ti-arrows-vertical"></i></span></a>
                             </th>
 
-                            <!--tableconfig_column_29 [AI Analysis Button]-->
+                            <!--tableconfig_column_29 [Health Report Button]-->
                             @if(config('table.tableconfig_column_29'))
-                            <th class="col_ai_analysis {{ config('table.tableconfig_column_29') }} tableconfig_column_29" title="AI Analysis">
-                                <i class="fas fa-wand-magic-sparkles text-warning mr-2" data-toggle="tooltip" data-placement="top" title="AI Analysis"></i>
+                            <th class="col_ai_analysis {{ config('table.tableconfig_column_29') }} tableconfig_column_29" title="Informe de Salud">
+                                <i class="fa-solid fa-wand-magic-sparkles" data-toggle="tooltip" data-placement="top" title="Informe de Salud"></i>
                             </th>
                             @endif
 
@@ -318,6 +318,14 @@
                                             class="ti-arrows-vertical"></i></span></a>
                             </th>
 
+                            <th class="col_client_stage">
+                                <a class="js-ajax-ux-request js-list-sorting" id="sort_current_stage_title"
+                                    href="javascript:void(0)"
+                                    data-url="{{ urlResource('/clients?action=sort&orderby=current_stage_title&sortorder=asc') }}">
+                                    Etapa<span class="sorting-icons"><i class="ti-arrows-vertical"></i></span>
+                                </a>
+                            </th>
+
                             <!--actions-->
                             @if (config('visibility.action_column'))
                                 <th class="col_action with-table-config-icon"><a
@@ -358,3 +366,67 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        function notify(type, message) {
+            if (window.NX && typeof NX.notification === 'function') {
+                NX.notification(type, message);
+            } else if (window.$ && $.growl) {
+                $.growl({ title: '', message: message }, { type: type === 'success' ? 'success' : 'danger' });
+            } else {
+                alert(message);
+            }
+        }
+
+        function parseError(xhr) {
+            if (!xhr) {
+                return 'Error inesperado';
+            }
+            if (xhr.responseJSON && xhr.responseJSON.notification && xhr.responseJSON.notification.value) {
+                return xhr.responseJSON.notification.value;
+            }
+            return xhr.responseText || 'Error inesperado';
+        }
+
+        $(document).off('change.clientStageQuick').on('change.clientStageQuick', '.js-client-stage-select', function () {
+            var select = $(this);
+            var clientId = select.data('client-id');
+            var stageId = select.val();
+
+            if (!clientId || !stageId) {
+                return;
+            }
+
+            $.ajax({
+                type: 'POST',
+                url: '/clients/' + clientId + '/client-stage',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    client_stage_id: stageId,
+                    change_detail: ''
+                },
+                success: function (response) {
+                    notify('success', response.message || 'Etapa actualizada');
+                    if (response && response.item) {
+                        var row = $('#client_' + clientId);
+                        var label = row.find('.js-client-stage-label');
+                        var selectedOption = select.find('option:selected');
+                        var stageColor = selectedOption.data('stage-color') || '#ECEFF1';
+
+                        label.text(response.item.client_stage_title || '-');
+                        label.attr('data-stage-id', String(response.item.client_stage_id || '0'));
+                        label.css({
+                            'background-color': stageColor,
+                            'color': '#2f3b52',
+                            'border': '1px solid rgba(47,59,82,.18)'
+                        });
+                    }
+                },
+                error: function (xhr) {
+                    notify('error', parseError(xhr));
+                }
+            });
+        });
+    })();
+</script>

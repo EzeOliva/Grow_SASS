@@ -54,6 +54,7 @@ class Kernel extends HttpKernel {
         //[MT]
         'tenant' => [
 
+            \App\Http\Middleware\Whatsapp\BootstrapTenant::class,
             \Spatie\Multitenancy\Http\Middleware\NeedsTenant::class,
             //\Spatie\Multitenancy\Http\Middleware\EnsureValidTenantSession::class,
 
@@ -462,5 +463,8 @@ class Kernel extends HttpKernel {
 
         //[growcrm] - [reports]
         'searchMiddlewareIndex' => \App\Http\Middleware\Search\Index::class,
+
+        //[growcrm] - [whatsapp permissions]
+        'whatsappPermissions' => \App\Http\Middleware\WhatsappPermissions::class,
     ];
 }

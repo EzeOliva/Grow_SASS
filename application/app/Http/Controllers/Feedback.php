@@ -19,10 +19,12 @@ use App\Http\Responses\Feedback\EditResponse;
 use App\Repositories\FeedbackRepository;
 use App\Repositories\FeedbackQueryRepository;
 use App\Repositories\FeedbackDetailRepository;
+use App\Repositories\ClientAIRepository;
 use App\Rules\NoTags;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class Feedback extends Controller
 {
@@ -30,11 +32,13 @@ class Feedback extends Controller
     protected $feedbackRepository;
     protected $feedbackDetailRepository;
     protected $feedbackQueryRepository;
+    protected $clientAIRepository;
 
     public function __construct(
         FeedbackRepository $feedbackRepository,
         FeedbackDetailRepository $feedbackDetailRepository,
-        FeedbackQueryRepository $feedbackQueryRepository
+        FeedbackQueryRepository $feedbackQueryRepository,
+        ClientAIRepository $clientAIRepository
 
     ) {
 
@@ -47,6 +51,7 @@ class Feedback extends Controller
         $this->feedbackRepository = $feedbackRepository;
         $this->feedbackDetailRepository = $feedbackDetailRepository;
         $this->feedbackQueryRepository = $feedbackQueryRepository;
+        $this->clientAIRepository = $clientAIRepository;
     }
 
     /**
@@ -93,13 +98,36 @@ class Feedback extends Controller
     public function create() {
 
         $feedbackQueries = $this->feedbackQueryRepository->all();
+        $feedbackImpact = [
+            'tasks_completed' => 0,
+            'capacitaciones_count' => 0,
+            'expectations_fulfilled' => 0,
+            'minutas_count' => 0,
+        ];
+
+        $clientId = (int) (Auth::user()->clientid ?? 0);
+        if ($clientId > 0) {
+            try {
+                $healthData = $this->clientAIRepository->getClientHealthReportData($clientId, 'quarter');
+                $feedbackImpact = [
+                    'tasks_completed' => (int) ($healthData['tasks_completed'] ?? 0),
+                    'capacitaciones_count' => (int) ($healthData['capacitaciones_count'] ?? 0),
+                    'expectations_fulfilled' => (int) ($healthData['expectations_fulfilled'] ?? 0),
+                    'minutas_count' => (int) ($healthData['minutas_count'] ?? 0),
+                ];
+            } catch (\Throwable $e) {
+                // Keep default values when health data is not available.
+            }
+        }
+
         //page settings
         $page = $this->pageSettings('create');
 
         //reponse payload
         $payload = [
             'page' => $page,
-            'feedbackQueries' => $feedbackQueries
+            'feedbackQueries' => $feedbackQueries,
+            'feedbackImpact' => $feedbackImpact,
         ];
 
         //show the form
@@ -119,7 +147,7 @@ class Feedback extends Controller
         $payload = [];
         //save the client first [API]
         if ($newFeedback = $this->feedbackRepository->create([
-            'client_id'=> auth()->user()->clientid,
+            'client_id'=> Auth::user()->clientid,
             'feedback_date'=> now()->format('Y-m-d H:i:s'),
             'comment'=> $request->get('comment'),
             'feedback_created'=> now()->format('Y-m-d H:i:s'),

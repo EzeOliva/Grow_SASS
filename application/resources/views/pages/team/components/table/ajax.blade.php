@@ -106,7 +106,7 @@
                 data-ajax-type="GET"
                 data-loading-target="basicModalContent"
                 data-loading-class="loading">
-                <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
             </button>
             <!--/AI Analysis-->
         </span>

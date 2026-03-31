@@ -2,8 +2,9 @@
         <div class="modal-content">
             <div class="modal-header" id="basicModalHeader">
                 <h3 class="modal-title">
-                    <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>
-                    <span>Análisis de Equipo con IA - {{ $team->full_name ?? 'Miembro del Equipo' }}</span>    </h3>
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>AI Team Analysis - {{ $team->full_name ?? 'Team Member' }}</span>
+                </h3>
                 <button type="button" class="close" data-dismiss="modal" id="basicModalCloseIcon">
                     <i class="ti-close"></i>
                 </button>
@@ -18,7 +19,7 @@
                                 data-url="{{ route('team.analyze.ai.base.weekly_report', ['team_id' => $team->id ?? '']) }}"
                                 data-ajax-type="GET" data-loading-target="analysis-content"
                                 data-loading-class="loading">
-                                <i class="fas fa-calendar-week"></i> Reporte Semanal
+                                <i class="fas fa-calendar-week"></i> Weekly Report
                             </a>
                         </li>
                         <li class="nav-item">
@@ -27,7 +28,7 @@
                                 data-url="{{ route('team.analyze.ai.base.general_alerts', ['team_id' => $team->id ?? '']) }}"
                                 data-ajax-type="GET" data-loading-target="analysis-content"
                                 data-loading-class="loading">
-                                <i class="fas fa-exclamation-triangle"></i> Alertas Generales
+                                <i class="fas fa-exclamation-triangle"></i> General Alerts
                             </a>
                         </li>
                         <li class="nav-item">
@@ -36,7 +37,7 @@
                                 data-url="{{ route('team.analyze.ai.base.productivity', ['team_id' => $team->id ?? '']) }}"
                                 data-ajax-type="GET" data-loading-target="analysis-content"
                                 data-loading-class="loading">
-                                <i class="fas fa-chart-line"></i> Productividad
+                                <i class="fas fa-chart-line"></i> Productivity
                             </a>
                         </li>
                     </ul>
@@ -45,9 +46,9 @@
                         <div class="tab-pane show active" id="analysis-content" role="tabpanel">
                             <div class="text-center">
                                 <div class="spinner-border text-primary" role="status">
-                                    <span class="sr-only">Cargando...</span>
+                                    <span class="sr-only">Loading...</span>
                                 </div>
-                                <p class="mt-2">Analizando la actividad del miembro del equipo...</p>
+                                <p class="mt-2">Analyzing team member activity...</p>
                             </div>
                         </div>
                     </div>

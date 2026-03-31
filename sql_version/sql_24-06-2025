@@ -55,3 +55,13 @@ CREATE TABLE `client_expectations` (
   `expectation_created` datetime DEFAULT current_timestamp(),
   `expectation_updated` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;
+
+-- Pipeline de clientes: descripción obligatoria por etapa
+ALTER TABLE client_stages
+  ADD COLUMN client_stage_description TEXT NULL AFTER client_stage_title;
+
+UPDATE client_stages
+SET client_stage_description = COALESCE(NULLIF(TRIM(client_stage_description), ''), CONCAT('Etapa ', client_stage_title));
+
+ALTER TABLE client_stages
+  MODIFY COLUMN client_stage_description TEXT NOT NULL;

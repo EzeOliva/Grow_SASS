@@ -413,6 +413,17 @@
                     </a>
                 </li>
                 @endif
+                 <li class="nav-item">
+                    <a class="nav-link waves-effect waves-dark font-22 p-t-10 p-r-10" href="{{ url('/messages') }}"
+                        aria-expanded="false">
+                        <i class="sl-icon-bubbles"></i>
+                        <div class="notify {{ runtimeVisibilityNotificationIcon(auth()->user()->count_message_notifications) }}"
+                            id="topnav-messages-notification-icon">
+                            <span class="heartbit"></span>
+                            <span class="point"></span>
+                        </div>
+                    </a>
+                </li>
                 
                 <!--[MODULES] - dynamic menu-->
                 {!! config('modules.menus.main.parent14') !!}

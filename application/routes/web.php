@@ -1,8 +1,20 @@
 <?php
 
-//TESTING [DEV]
-Route::get("test", "Test@index");
-Route::post("test", "Test@index");
+// SIMPLE TEST ROUTE FOR MESSAGES
+Route::get('/test-messages-simple', function() {
+    return view('pages.messages.wrapper', [
+        'users' => collect([
+            (object)['id' => 1, 'name' => 'Test User 1', 'email' => 'test1@example.com', 'full_name' => 'Test User 1', 'is_online' => true],
+            (object)['id' => 2, 'name' => 'Test User 2', 'email' => 'test2@example.com', 'full_name' => 'Test User 2', 'is_online' => false],
+        ]),
+        'whatsapp_connections' => collect([
+            (object)['id' => 1, 'connection_name' => 'Test WhatsApp', 'phone_number' => '+1234567890', 'status' => 'connected'],
+        ]),
+        'thread' => null
+    ]);
+});
+
+
 
 //HOME PAGE
 Route::any('/', function () {
@@ -44,7 +56,17 @@ Route::group(['prefix' => 'clients'], function () {
     Route::post("/change-category", "Clients@changeCategoryUpdate");
     Route::get("/{client}/client-details", "Clients@details")->where('client', '[0-9]+');
     Route::get("/{client}/client-expectativas", "Clients@expectativas")->where('client', '[0-9]+');
+    Route::get("/{client}/client-minutas", "Clients@minutas")->where('client', '[0-9]+');
+    Route::post("/{client}/client-minutas", "Clients@storeMinuta")->where('client', '[0-9]+')->middleware(['demoModeCheck']);
+    Route::put("/{client}/client-minutas/{minuta}", "Clients@updateMinuta")->where(['client' => '[0-9]+', 'minuta' => '[0-9]+'])->middleware(['demoModeCheck']);
+    Route::delete("/{client}/client-minutas/{minuta}", "Clients@destroyMinuta")->where(['client' => '[0-9]+', 'minuta' => '[0-9]+'])->middleware(['demoModeCheck']);
     Route::get("/{client}/client-feedback", "Clients@feedback")->where('client', '[0-9]+');
+    Route::get("/{client}/client-capacitaciones", "Clients@capacitaciones")->where('client', '[0-9]+');
+    Route::post("/{client}/client-capacitaciones", "Clients@storeCapacitacion")->where('client', '[0-9]+')->middleware(['demoModeCheck']);
+    Route::put("/{client}/client-capacitaciones/{capacitacion}", "Clients@updateCapacitacion")->where(['client' => '[0-9]+', 'capacitacion' => '[0-9]+'])->middleware(['demoModeCheck']);
+    Route::delete("/{client}/client-capacitaciones/{capacitacion}", "Clients@destroyCapacitacion")->where(['client' => '[0-9]+', 'capacitacion' => '[0-9]+'])->middleware(['demoModeCheck']);
+    Route::get("/{client}/client-etapas", "Clients@etapas")->where('client', '[0-9]+');
+    Route::post("/{client}/client-stage", "Clients@updateStage")->where('client', '[0-9]+')->middleware(['demoModeCheck']);
     Route::get("/{client}/client-clientai", "Clients@clientai")->where('client', '[0-9]+');
     Route::get("/{client}/client-details", "Clients@details")->where('client', '[0-9]+');
     Route::post("/{client}/client-details", "Clients@updateDescription")->where('client', '[0-9]+');
@@ -58,7 +80,7 @@ Route::group(['prefix' => 'clients'], function () {
     Route::get("/{client}/impersonate", "Clients@ImpersonateClient")->where('client', '[0-9]+');
     //dynamic load
     Route::any("/{client}/{section}", "Clients@showDynamic")
-        ->where(['client' => '[0-9]+', 'section' => 'details|contacts|projects|files|client-files|tickets|invoices|expenses|payments|timesheets|estimates|notes|expectativas|feedback|clientai|project-files|client-files']);
+        ->where(['client' => '[0-9]+', 'section' => 'details|contacts|projects|files|client-files|tickets|invoices|expenses|payments|timesheets|estimates|notes|expectativas|minutas|capacitaciones|etapas|feedback|clientai|project-files|client-files']);
 
     Route::get('/{clientId}/ai-feedback-analysis', [App\Http\Controllers\Clients::class, 'analyzeAIFeedbackOnly'])->name('clients.ai.feedback.analysis');
     Route::get('/clients/{client}/analyze-ai/feedback-modal', 'Clients@analyzeAIFeedbackModal')->where('client', '[0-9]+')->name('clients.analyze.ai.feedback.modal');
@@ -67,12 +89,16 @@ Route::group(['prefix' => 'clients'], function () {
     Route::get('/{client}/analyze-ai/expectations', 'Clients@analyzeAIExpectations')->where('client', '[0-9]+')->name('clients.analyze.ai.expectations');
     Route::get('/{client}/analyze-ai/projects', 'Clients@analyzeAIProjects')->where('client', '[0-9]+')->name('clients.analyze.ai.projects');
     Route::get('/{client}/analyze-ai/comments', 'Clients@analyzeAIComments')->where('client', '[0-9]+')->name('clients.analyze.ai.comments');
+    Route::get('/{client}/analyze-ai/health-report', 'Clients@analyzeAIHealthReport')->where('client', '[0-9]+')->name('clients.analyze.ai.health');
+    Route::get('/{client}/analyze-ai/meeting-prep', 'Clients@analyzeAIMeetingPrep')->where('client', '[0-9]+')->name('clients.analyze.ai.meeting.prep');
     
     // New AI Analysis Routes
     Route::post('/{client}/generate-ai-feedback-analysis', 'Clients@generateAIFeedbackAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.feedback');
     Route::post('/{client}/generate-ai-expectations-analysis', 'Clients@generateAIExpectationsAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.expectations');
     Route::post('/{client}/generate-ai-projects-analysis', 'Clients@generateAIProjectsAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.projects');
     Route::post('/{client}/generate-ai-comments-analysis', 'Clients@generateAICommentsAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.comments');
+    Route::post('/{client}/generate-ai-health-analysis', 'Clients@generateAIHealthAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.health');
+    Route::post('/{client}/generate-ai-meeting-prep', 'Clients@generateAIMeetingPrep')->where('client', '[0-9]+')->name('clients.generate.ai.meeting.prep');
 });
 Route::any("/client/{x}/profile", "Clients@profile")->where('x', '[0-9]+');
 Route::resource('clients', 'Clients');
@@ -791,6 +817,9 @@ Route::group(['prefix' => 'settings/theme'], function () {
 Route::group(['prefix' => 'settings/clients'], function () {
     Route::get("/", "Settings\Clients@index");
     Route::put("/", "Settings\Clients@update")->middleware(['demoModeCheck']);
+    Route::post("/stages", "Settings\Clients@storeStage")->middleware(['demoModeCheck']);
+    Route::put("/stages/{id}", "Settings\Clients@updateStage")->where('id', '[0-9]+')->middleware(['demoModeCheck']);
+    Route::delete("/stages/{id}", "Settings\Clients@destroyStage")->where('id', '[0-9]+')->middleware(['demoModeCheck']);
 });
 
 //SETTINGS - TAGS
@@ -1078,10 +1107,15 @@ Route::group(['prefix' => 'settings/roles'], function () {
 Route::resource('settings/roles', 'Settings\Roles');
 Route::post("/settings/roles", "Settings\Roles@Store")->middleware(['demoModeCheck']);
 
+
+
 //SETTINGS - CLIENTS
 Route::group(['prefix' => 'settings/clients'], function () {
     Route::get("/", "Settings\Clients@index");
     Route::put("/", "Settings\Clients@update")->middleware(['demoModeCheck']);
+    Route::post("/stages", "Settings\Clients@storeStage")->middleware(['demoModeCheck']);
+    Route::put("/stages/{id}", "Settings\Clients@updateStage")->where('id', '[0-9]+')->middleware(['demoModeCheck']);
+    Route::delete("/stages/{id}", "Settings\Clients@destroyStage")->where('id', '[0-9]+')->middleware(['demoModeCheck']);
 });
 
 //SETTINGS - TICKETS
@@ -1114,13 +1148,22 @@ Route::group(['prefix' => 'settings/logos'], function () {
 
 //SETTINGS - DYNAMIC URLS's
 Route::group(['prefix' => 'app/settings'], function () {
+    //SETTINGS - PERMISSIONS (must be before catch-all route)
+    Route::group(['prefix' => 'permissions'], function () {
+        Route::get("/", "Settings\Permissions@index");
+        Route::get("/modules", "Settings\Permissions@modules");
+        Route::get("/roles", "Settings\Permissions@roles");
+        Route::get("/whatsapp", "Settings\Permissions@whatsapp");
+        Route::get("/test", "Settings\PermissionsTest@test");
+    });
+    
     Route::get("/{any}", "Settings\Dynamic@showDynamic")->where(['any' => '.*']);
 });
 Route::get("app/categories", "Settings\Dynamic@showDynamic");
 Route::get("app/tags", "Settings\Dynamic@showDynamic");
 
 //SETTINGS - CRONJOBS
-Route::get("/settings/cronjobs", "Settings\Cronjobs@index");
+// Route::get("/settings/cronjobs", "Settings\Cronjobs@index");
 
 //SETTINGS - TASKS
 Route::group(['prefix' => 'settings/subscriptions'], function () {
@@ -1422,3 +1465,498 @@ Route::get('/leads/analyze-ai/tab/analysis', 'Leads@analyzeAITabAnalysis')->name
 Route::get('/leads/analyze-ai/tab/scoring', 'Leads@analyzeAITabScoring')->name('leads.analyze.ai.tab.scoring');
 Route::get('/leads/analyze-ai/ai/analysis', 'Leads@analyzeAIAIAnalysis')->name('leads.analyze.ai.ai.analysis');
 Route::get('/leads/analyze-ai/ai/scoring', 'Leads@analyzeAIAIScoring')->name('leads.analyze.ai.ai.scoring');
+
+//WHATSAPP TICKET SYSTEM
+// Main WhatsApp entry point - simple redirect to dashboard
+// (Removed) Legacy WhatsApp route aliases without middleware
+
+// Simple WhatsApp routes for testing (without tenant middleware)
+// (Removed) Legacy WhatsApp dashboard route without middleware
+
+// (Removed) Legacy WhatsApp tickets route without middleware
+
+// (Removed) Legacy WhatsApp connections route without middleware
+
+// (Removed) WhatsApp test route
+
+// (Removed) WhatsApp connections test route
+
+Route::get('/whatsapp/connections-simple', function () {
+    try {
+        $connections = \App\Models\WhatsappConnection::where('tenant_id', 1)->get();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Table exists and working!',
+            'count' => $connections->count()
+        ]);
+    } catch (Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ]);
+    }
+})->name('whatsapp.connections.create');
+
+// Test route for basic functionality
+Route::get('/whatsapp/test-basic', function () {
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Basic routing is working!',
+        'models' => [
+            'WhatsappConnection' => class_exists('\App\Models\WhatsappConnection'),
+            'WhatsappMessage' => class_exists('\App\Models\WhatsappMessage'),
+            'WhatsappTicket' => class_exists('\App\Models\WhatsappTicket'),
+            'Tenant' => class_exists('\App\Models\Tenant'),
+            'User' => class_exists('\App\Models\User')
+        ]
+    ]);
+})->name('whatsapp.test.basic');
+
+// WhatsApp Routes (without tenant middleware for testing)
+Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
+    
+    // Test route
+    Route::get('/test-system', function () {
+        return response()->json([
+            'status' => 'success',
+            'message' => 'WhatsApp system is working!',
+            'timestamp' => now()
+        ]);
+    })->name('test.system');
+    
+    // Connections
+    Route::get('/connections', [\App\Http\Controllers\WhatsappConnectionController::class, 'index'])->name('connections.index');
+    Route::get('/connections/create', [\App\Http\Controllers\WhatsappConnectionController::class, 'create'])->name('connections.create');
+    
+    // Tickets
+    Route::get('/tickets', [\App\Http\Controllers\WhatsappTicketController::class, 'index'])->name('tickets.index');
+    Route::get('/tickets/create', [\App\Http\Controllers\WhatsappTicketController::class, 'create'])->name('tickets.create');
+});
+
+Route::get('/whatsapp/test-connections', function () {
+    return response()->json(['status' => 'success', 'message' => 'WhatsApp Connections Test Route Working!']);
+})->name('whatsapp.test-connections');
+
+Route::get('/whatsapp/simple', function () {
+    return view('whatsapp.test');
+})->name('whatsapp.simple');
+
+// WhatsApp basic connectivity routes (ensure paths are wired even if controllers fail to register)
+Route::get('/whatsapp/reporting', function () {
+    return view('whatsapp.reporting.index');
+})->name('whatsapp.reporting.index');
+Route::get('/whatsapp/contacts', function () {
+    return view('whatsapp.contacts.index');
+})->name('whatsapp.contacts.index');
+Route::get('/whatsapp/messages/templates', function () {
+    // If a dedicated templates view exists
+    if (view()->exists('whatsapp.templates.index')) {
+        return view('whatsapp.templates.index');
+    }
+    return response()->json(['status' => 'ok', 'templates' => []]);
+})->name('whatsapp.messages.templates');
+Route::get('/whatsapp/line-configs', function () {
+    return view('whatsapp.line-configs.index');
+})->name('whatsapp.line-configs.index');
+Route::get('/whatsapp/tags', function () {
+    return view('whatsapp.tags.index');
+})->name('whatsapp.tags.index');
+Route::get('/whatsapp/ticket-types', function () {
+    return view('whatsapp.ticket-types.index');
+})->name('whatsapp.ticket-types.index');
+
+// WhatsApp routes are now handled by routes/whatsapp.php
+
+// WhatsApp Connections Routes are now handled by routes/whatsapp.php
+
+Route::post('/whatsapp/webhook', function () {
+    return response()->json(['status' => 'received']);
+})->name('whatsapp.webhook');
+
+// Test route for debugging
+Route::get('/whatsapp/test-debug', function () {
+    return response()->json(['status' => 'debug route working']);
+})->name('whatsapp.test-debug');
+
+// WhatsApp Reporting, Contacts, and Messages Routes are now handled by routes/whatsapp.php
+
+// WhatsApp Tick Lists Routes are now handled by routes/whatsapp.php
+
+// WhatsApp Line Configurations Routes are now handled by routes/whatsapp.php
+
+// WhatsApp Tags Routes are now handled by routes/whatsapp.php
+
+// WhatsApp Ticket Types Routes are now handled by routes/whatsapp.php
+
+// Test route for WhatsApp tickets debugging
+Route::get('/whatsapp/debug', function () {
+    try {
+        // Test tenant connection
+        $dbName = DB::connection('tenant')->getDatabaseName();
+        $tableExists = Schema::connection('tenant')->hasTable('whatsapp_tickets');
+        $ticketCount = DB::connection('tenant')->table('whatsapp_tickets')->count();
+        
+        return response()->json([
+            'success' => true,
+            'database' => $dbName,
+            'table_exists' => $tableExists,
+            'ticket_count' => $ticketCount,
+            'sample_tickets' => DB::connection('tenant')->table('whatsapp_tickets')->limit(3)->get(),
+            'connection_status' => 'Connected to tenant database'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'stack_trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Simple test route for WhatsApp tickets (bypasses middleware)
+Route::get('/whatsapp/test-simple', function () {
+    try {
+        // Set up tenant connection manually
+        $dbName = env('TENANT_DB', 'growcrm_tenant_1');
+        \Config::set('database.connections.tenant.database', $dbName);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+        
+        // Check data
+        $tableExists = Schema::connection('tenant')->hasTable('whatsapp_tickets');
+        $ticketCount = $tableExists ? DB::connection('tenant')->table('whatsapp_tickets')->count() : 0;
+        $sampleTickets = $tableExists ? DB::connection('tenant')->table('whatsapp_tickets')->limit(5)->get() : collect();
+        
+        return response()->json([
+            'success' => true,
+            'database' => $dbName,
+            'table_exists' => $tableExists,
+            'ticket_count' => $ticketCount,
+            'sample_tickets' => $sampleTickets,
+            'connection_status' => 'Connected to tenant database'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'stack_trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Debug route for WhatsApp tickets service
+Route::get('/whatsapp/debug-service', function () {
+    try {
+        $service = new \App\Services\WhatsappTicketService();
+        $tickets = $service->getAllTickets();
+        
+        return response()->json([
+            'success' => true,
+            'tickets_count' => $tickets->count(),
+            'tickets' => $tickets->toArray(),
+            'service_method' => 'getAllTickets'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'stack_trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Minimal test route for WhatsApp tickets
+Route::get('/whatsapp/test-minimal', function () {
+    try {
+        // Set up tenant connection manually
+        $dbName = env('TENANT_DB', 'growcrm_tenant_1');
+        \Config::set('database.connections.tenant.database', $dbName);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+        
+        // Check data directly
+        $tableExists = Schema::connection('tenant')->hasTable('whatsapp_tickets');
+        $ticketCount = 0;
+        $sampleTickets = collect();
+        
+        if ($tableExists) {
+            $ticketCount = DB::connection('tenant')->table('whatsapp_tickets')->count();
+            if ($ticketCount > 0) {
+                $sampleTickets = DB::connection('tenant')->table('whatsapp_tickets')->limit(3)->get();
+            }
+        }
+        
+        return view('whatsapp.tickets.index', [
+            'tickets' => $sampleTickets,
+            'kpis' => ['total_tickets' => $ticketCount, 'open_tickets' => 0, 'in_progress_tickets' => 0, 'closed_tickets' => 0],
+            'agents' => collect([]),
+            'debug_info' => [
+                'database' => $dbName,
+                'table_exists' => $tableExists,
+                'ticket_count' => $ticketCount,
+                'raw_tickets' => $sampleTickets->toArray()
+            ]
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'stack_trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Test route for debugging email functionality
+Route::get('/test-email', function () {
+    try {
+        // Test with Gmail SMTP settings
+        $smtpConfig = [
+            'host' => 'smtp.gmail.com',
+            'port' => 587,
+            'encryption' => 'tls',
+            'username' => 'your-email@gmail.com', // Replace with your email
+            'password' => 'your-app-password', // Replace with your app password
+            'from_address' => 'your-email@gmail.com',
+            'from_name' => 'Test User'
+        ];
+
+        $emailService = new \App\Services\EnhancedEmailService($smtpConfig);
+        
+        // Test SMTP connection
+        $connectionTest = $emailService->testSmtpConnection();
+        
+        if ($connectionTest['success']) {
+            // Test sending email
+            $result = $emailService->sendTextEmail(
+                'test@example.com', // Replace with your test email
+                'Test Email from Laravel',
+                'This is a test email to verify SMTP configuration is working.'
+            );
+            
+            return response()->json([
+                'connection_test' => $connectionTest,
+                'email_test' => $result,
+                'message' => 'Email test completed'
+            ]);
+        } else {
+            return response()->json([
+                'connection_test' => $connectionTest,
+                'message' => 'SMTP connection failed'
+            ]);
+        }
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Enhanced Messages with WhatsApp Integration
+Route::prefix('/messages')->middleware(['auth'])->group(function () {
+    Route::get('/', [App\Http\Controllers\Messages::class, 'index'])->name('messages.index');
+    
+    // Chat History - Must come before dynamic routes
+    Route::get('/chat-history', [App\Http\Controllers\Messages::class, 'getChatHistory'])->name('messages.chat.history.simple');
+    Route::get('/chat/{threadId}/{threadType}/history', [App\Http\Controllers\Messages::class, 'getChatHistory'])->name('messages.chat.history');
+    
+    Route::get('/{threadId}', [App\Http\Controllers\Messages::class, 'showThread'])->name('messages.thread')->where('threadId', '[0-9a-zA-Z_]+');
+    Route::post('/feed', [App\Http\Controllers\Messages::class, 'feed'])->name('messages.feed');
+    Route::post('/post/text', [App\Http\Controllers\Messages::class, 'postText'])->name('messages.post.text');
+    Route::post('/post/files', [App\Http\Controllers\Messages::class, 'postFiles'])->name('messages.post.files');
+    Route::get('/templates', [App\Http\Controllers\Messages::class, 'getQuickTemplates'])->name('messages.templates');
+    Route::get('/connections', [App\Http\Controllers\Messages::class, 'getWhatsappConnections'])->name('messages.connections');
+    
+    // WhatsApp Integration Routes
+    Route::post('/whatsapp/send', [App\Http\Controllers\Messages::class, 'postWhatsAppMessage'])->name('messages.whatsapp.send')->middleware('whatsappPermissions:reply_clients');
+    Route::post('/whatsapp/connection/create', [App\Http\Controllers\Messages::class, 'createWhatsAppConnection'])->name('messages.whatsapp.connection.create')->middleware('whatsappPermissions:manage_messages');
+    Route::get('/whatsapp/connection/{connectionId}/qr', [App\Http\Controllers\Messages::class, 'generateQRCode'])->name('messages.whatsapp.connection.qr')->middleware('whatsappPermissions:access');
+    Route::get('/whatsapp/connection/{connectionId}/status', [App\Http\Controllers\Messages::class, 'checkConnectionStatus'])->name('messages.whatsapp.connection.status')->middleware('whatsappPermissions:access');
+    
+    // Email Integration Routes
+    Route::post('/email/send', [App\Http\Controllers\Messages::class, 'postEmailMessage'])->name('messages.email.send');
+});
+
+// Test route for messages without authentication (temporary)
+Route::get('/test-messages-no-auth', function() {
+    try {
+        // Mock data for testing
+        $data = [
+            'users' => collect([
+                (object)['id' => 1, 'first_name' => 'Test', 'last_name' => 'User 1', 'email' => 'test1@example.com', 'avatar_directory' => null, 'avatar_filename' => null, 'role_id' => 1, 'position' => 'Sales', 'status' => 'active'],
+                (object)['id' => 2, 'first_name' => 'Test', 'last_name' => 'User 2', 'email' => 'test2@example.com', 'avatar_directory' => null, 'avatar_filename' => null, 'role_id' => 2, 'position' => 'Support', 'status' => 'active'],
+            ]),
+            'whatsapp_connections' => collect([
+                (object)['id' => 1, 'connection_name' => 'Test WhatsApp', 'phone_number' => '+1234567890', 'status' => 'connected'],
+            ]),
+            'thread' => null
+        ];
+        
+        return view('pages.messages.wrapper', $data);
+    } catch (Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
+// Debug route to check users in database
+Route::get('/debug-users', function() {
+    try {
+        $users = \App\Models\User::all();
+        $currentUser = auth()->user();
+        
+        return response()->json([
+            'total_users' => $users->count(),
+            'current_user' => $currentUser ? [
+                'id' => $currentUser->id,
+                'first_name' => $currentUser->first_name ?? 'N/A',
+                'last_name' => $currentUser->last_name ?? 'N/A',
+                'full_name' => ($currentUser->first_name ?? '') . ' ' . ($currentUser->last_name ?? ''),
+                'email' => $currentUser->email
+            ] : null,
+            'all_users' => $users->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name ?? 'N/A',
+                    'last_name' => $user->last_name ?? 'N/A',
+                    'full_name' => ($user->first_name ?? '') . ' ' . ($user->last_name ?? ''),
+                    'email' => $user->email,
+                    'role_id' => $user->role_id,
+                    'position' => $user->position ?? 'N/A',
+                    'status' => $user->status ?? 'N/A',
+                    'avatar_directory' => $user->avatar_directory ?? 'N/A',
+                    'avatar_filename' => $user->avatar_filename ?? 'N/A'
+                ];
+            }),
+            'filtered_users' => \App\Models\User::where('id', '!=', $currentUser ? $currentUser->id : 0)->get()->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name ?? 'N/A',
+                    'last_name' => $user->last_name ?? 'N/A',
+                    'full_name' => ($user->first_name ?? '') . ' ' . ($user->last_name ?? ''),
+                    'email' => $user->email,
+                    'role_id' => $user->role_id,
+                    'position' => $user->position ?? 'N/A',
+                    'status' => $user->status ?? 'N/A',
+                    'avatar_directory' => $user->avatar_directory ?? 'N/A',
+                    'avatar_filename' => $user->avatar_filename ?? 'N/A'
+                ];
+            })
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('debug.users');
+
+// Debug route for messages table
+Route::get('/debug-messages', function() {
+    try {
+        $messages = \App\Models\Message::all();
+        $users = \App\Models\User::all();
+        
+        return response()->json([
+            'total_messages' => $messages->count(),
+            'total_users' => $users->count(),
+            'messages_sample' => $messages->take(5)->map(function($msg) {
+                return [
+                    'id' => $msg->message_id,
+                    'text' => $msg->message_text,
+                    'source' => $msg->message_source,
+                    'target' => $msg->message_target,
+                    'created' => $msg->message_created,
+                    'updated' => $msg->message_updated
+                ];
+            }),
+            'users_sample' => $users->take(5)->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => ($user->first_name ?? '') . ' ' . ($user->last_name ?? ''),
+                    'email' => $user->email
+                ];
+            })
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('debug.messages');
+
+// Test route to create sample messages
+Route::get('/create-test-messages', function() {
+    try {
+        $currentUser = \Illuminate\Support\Facades\Auth::user();
+        $otherUsers = \App\Models\User::where('id', '!=', $currentUser->id)->take(2)->get();
+        
+        if ($otherUsers->isEmpty()) {
+            return response()->json(['error' => 'No other users found'], 400);
+        }
+        
+        $otherUser = $otherUsers->first();
+        
+        // Create some test messages
+        $messages = [
+            [
+                'message_source' => 'user_' . $currentUser->id,
+                'message_target' => 'user_' . $otherUser->id,
+                'message_text' => 'Hello! This is a test message from ' . $currentUser->first_name,
+                'tenant_id' => $currentUser->tenant_id,
+                'message_created' => now()->subHours(2),
+                'message_updated' => now()->subHours(2)
+            ],
+            [
+                'message_source' => 'user_' . $otherUser->id,
+                'message_target' => 'user_' . $currentUser->id,
+                'message_text' => 'Hi ' . $currentUser->first_name . '! This is a reply from ' . $otherUser->first_name,
+                'tenant_id' => $currentUser->tenant_id,
+                'message_created' => now()->subHour(),
+                'message_updated' => now()->subHour()
+            ],
+            [
+                'message_source' => 'user_' . $currentUser->id,
+                'message_target' => 'user_' . $otherUser->id,
+                'message_text' => 'Thanks for the reply! How are you doing?',
+                'tenant_id' => $currentUser->tenant_id,
+                'message_created' => now()->subMinutes(30),
+                'message_updated' => now()->subMinutes(30)
+            ]
+        ];
+        
+        foreach ($messages as $messageData) {
+            \App\Models\Message::create($messageData);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Created ' . count($messages) . ' test messages',
+            'messages_created' => count($messages),
+            'between_users' => $currentUser->first_name . ' and ' . $otherUser->first_name
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+})->name('create.test.messages');
+
+// Test route for messages backend
+Route::post('/test-message-backend', function() {
+    try {
+        return response()->json([
+            'success' => true,
+            'message' => 'Backend is working!',
+            'data' => request()->all()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+})->name('test.message.backend');
+
+
+

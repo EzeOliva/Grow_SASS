@@ -12,8 +12,6 @@
 
     <!--page heading-->
     <div class="container page-wrapper">
-
-
         <!--contact form-->
         <div class="row" id="contact-us-form">
             <div class="col-6">
@@ -71,10 +69,6 @@
                 </div>
             </div>
         </div>
-
-
-
-
         <!--thank you-->
         <div class="row hidden" id="contact-us-thank-you">
             <div class="col-12">{!! _clean($content->frontend_data_5) !!}</div>

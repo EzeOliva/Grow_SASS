@@ -3,6 +3,7 @@ namespace App\Repositories;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Client;
 
 class ClientAIRepository
@@ -35,41 +36,6 @@ class ClientAIRepository
                 ->get();
         }
 
-        if (in_array('communication', $topics)) {
-            // IDs de proyectos y tareas del cliente
-            $projectIds = DB::table('projects')
-                ->where('project_clientid', $clientId)
-                ->pluck('project_id');
-
-            $taskIds = DB::table('tasks')
-                ->where(function ($q) use ($clientId, $projectIds) {
-                    $q->where('task_clientid', $clientId)      // si lo grabas directo
-                    ->orWhereIn('task_projectid', $projectIds); // si solo hereda del proyecto
-                })
-                ->pluck('task_id');
-
-            // Comentarios de proyectos
-            $projectComments = DB::table('comments')
-                ->where('commentresource_type', 'project')
-                ->whereIn('commentresource_id', $projectIds)
-                ->whereBetween('comment_created', [$startDate, $endDate])
-                ->select('comment_text', 'comment_created', 'comment_creatorid')
-                ->get();
-
-            // Comentarios de tareas
-            $taskComments = DB::table('comments')
-                ->where('commentresource_type', 'task')
-                ->whereIn('commentresource_id', $taskIds)
-                ->whereBetween('comment_created', [$startDate, $endDate])
-                ->select('comment_text', 'comment_created', 'comment_creatorid')
-                ->get();
-
-            $data['communication'] = $projectComments
-                ->merge($taskComments)
-                ->sortByDesc('comment_created')
-                ->values();
-        }
-        
         return $data;
     }
 
@@ -120,18 +86,6 @@ class ClientAIRepository
             $summary .= "- Overdue expectations: {$s['overdue_count']}\n";
             $summary .= "- Total expectations: {$s['total_count']}\n";
         }
-
-        if (!empty($data['communication'])) {
-            $summary .= "\nComentarios en proyectos y tareas:\n";
-            foreach ($data['communication']->take(10) as $com) {
-                $author = DB::table('users')
-                            ->where('id', $com->comment_creatorid)
-                            ->value(DB::raw("CONCAT(first_name,' ',last_name)"));
-                $summary .= "- {$com->comment_created} – {$author}: “{$com->comment_text}”\n";
-            }
-            $summary .= "- Total en periodo: {$data['communication']->count()} comentarios\n";
-        }
-
 
         return $summary;
     }
@@ -241,40 +195,6 @@ class ClientAIRepository
             ->groupBy('tasks.task_id')
             ->orderByDesc('tasks.task_created')
             ->get();
-
-        // --- Comentarios (Proyecto + Tarea) ---
-        $commentQuery = DB::table('comments')
-            ->select('comments.*', 'users.first_name', 'users.last_name')
-            ->leftJoin('users', 'users.id', '=', 'comments.comment_creatorid')
-            ->where(function ($q) use ($clientId) {
-                $q->where(function ($q2) use ($clientId) {
-                    // Comentarios de proyectos
-                    $q2->where('commentresource_type', 'project')
-                        ->whereIn('commentresource_id', function ($sub) use ($clientId) {
-                            $sub->select('project_id')
-                                ->from('projects')
-                                ->where('project_clientid', $clientId);
-                        });
-                })->orWhere(function ($q2) use ($clientId) {
-                    // Comentarios de tareas
-                    $q2->where('commentresource_type', 'task')
-                        ->whereIn('commentresource_id', function ($sub) use ($clientId) {
-                            $sub->select('task_id')
-                                ->from('tasks')
-                                ->where('task_clientid', $clientId)
-                                ->orWhereIn('task_projectid', function ($p) use ($clientId) {
-                                    $p->select('project_id')
-                                    ->from('projects')
-                                    ->where('project_clientid', $clientId);
-                                });
-                        });
-                });
-            })
-            ->orderByDesc('comment_created')
-            ->get();
-        $lastComment = $commentQuery->first();
-        $daysSinceLastComment = $lastComment ? Carbon::parse($lastComment->comment_created)->diffInDays($now) : null;
-
 
         // --- Invoices with Line Items ---
         $invoices = DB::table('invoices')
@@ -464,134 +384,135 @@ class ClientAIRepository
         $expectationsSummary = $this->calculateExpectationsSummary($expectations);
 
         // --- Summarize Data ---
-        $prompt[] = "Eres una IA experta en análisis de negocios. Aquí tienes un perfil integral de un cliente de nuestro sistema CRM.";
+        $prompt[] = "You are an expert business analyst AI. Here is a comprehensive profile of a client from our CRM system.";
         $prompt[] = "\nClient Profile:";
-        $prompt[] = "- Nombre de la empresa: {$client->client_company_name}";
-        $prompt[] = "- Industria: " . ($client->industry ?? 'N/A');
-        $prompt[] = "- Categoria: " . ($client->category ?? 'N/A');
+        $prompt[] = "- Company Name: {$client->client_company_name}";
+        $prompt[] = "- Industry: " . ($client->industry ?? 'N/A');
+        $prompt[] = "- Category: " . ($client->category ?? 'N/A');
         $prompt[] = "- Status: " . ($client->client_status ?? 'N/A');
-        $prompt[] = "- Fecha de registro: {$client->client_created} (" . ($daysSinceJoined !== null ? "hace $daysSinceJoined días" : 'N/A') . ")";
-        $prompt[] = "- Descripcion: " . ($client->client_description ?? 'N/A');
+        $prompt[] = "- Joined: {$client->client_created} (" . ($daysSinceJoined !== null ? "$daysSinceJoined days ago" : 'N/A') . ")";
+        $prompt[] = "- Description: " . ($client->client_description ?? 'N/A');
         $prompt[] = "- Website: " . ($client->client_website ?? 'N/A');
-        $prompt[] = "- Telefono: " . ($client->client_phone ?? 'N/A');
+        $prompt[] = "- Phone: " . ($client->client_phone ?? 'N/A');
         $prompt[] = "- VAT: " . ($client->client_vat ?? 'N/A') . "\n";
 
-        $prompt[] = "Contactos (Total: {$users->count()}):";
+        $prompt[] = "Contacts (Total: {$users->count()}):";
         foreach ($users as $user) {
-            $roleName = $user->role_name ?? 'Sin rol';
+            $roleName = $user->role_name ?? 'No Role';
             $prompt[] = "- {$user->first_name} {$user->last_name} ({$user->email}), Role: {$roleName}, Type: {$user->type}";
         }
 
-        $prompt[] = "\nProyectos (Total: {$projects->count()}, Ultimo: " . ($lastProject ? $lastProject->project_created . ", $daysSinceLastProject dias atras" : 'N/A') . "):";
+        $prompt[] = "\nProjects (Total: {$projects->count()}, Last: " . ($lastProject ? $lastProject->project_created . ", $daysSinceLastProject days ago" : 'N/A') . "):";
         foreach ($projects->take(5) as $project) {
-            $prompt[] = "- {$project->project_title} (Status: {$project->project_status}, Categoria: {$project->project_category}, Credo: {$project->project_created}, Fecha limite: {$project->project_date_due})";
+            $prompt[] = "- {$project->project_title} (Status: {$project->project_status}, Category: {$project->project_category}, Created: {$project->project_created}, Deadline: {$project->project_date_due})";
         }
 
-        $prompt[] = "\nTareas (Total: {$projectTasks->count()}):";
+        $prompt[] = "\nProject Tasks (Total: {$projectTasks->count()}):";
         foreach ($projectTasks->take(5) as $task) {
-            $assignedUser = $task->assigned_users ?? 'Sin asignar';
-            $prompt[] = "- {$task->task_title} (Proyecto: {$task->project_title}, Status: {$task->task_status}, Asignado: {$assignedUser}, Vencimiento: {$task->task_date_due})";
+            $assignedUser = $task->assigned_users ?? 'Unassigned';
+            $prompt[] = "- {$task->task_title} (Project: {$task->project_title}, Status: {$task->task_status}, Assigned: {$assignedUser}, Due: {$task->task_date_due})";
         }
 
-        $prompt[] = "\nComunicación (comentarios) – Total: {$commentQuery->count()}, Último: " .
-            ($lastComment ? $lastComment->comment_created . ", hace $daysSinceLastComment días" : 'N/A');
-            foreach ($commentQuery->take(5) as $comm) {
-                $author = trim(($comm->first_name ?? '') . ' ' . ($comm->last_name ?? ''));
-                $prompt[] = "- {$comm->comment_created} – {$author}: “{$comm->comment_text}”";
-            }
+        $prompt[] = "\nFinancial Summary:";
+        $prompt[] = "- Total Invoiced: {$totalInvoiced}";
+        $prompt[] = "- Total Paid: {$totalPaid}";
+        $prompt[] = "- Outstanding Balance: {$outstandingBalance}";
 
-
-        $prompt[] = "\nResumen Financiero:";
-        $prompt[] = "- Total Facturado: {$totalInvoiced}";
-        $prompt[] = "- Total Pagado: {$totalPaid}";
-        $prompt[] = "- Saldo Pendiente: {$outstandingBalance}";
-
-        $prompt[] = "\nFacturas (Total: {$invoices->count()}, Última: " . ($lastInvoice ? $lastInvoice->bill_date . ", hace $daysSinceLastInvoice días" : 'N/A') . "):";
+        $prompt[] = "\nInvoices (Total: {$invoices->count()}, Last: " . ($lastInvoice ? $lastInvoice->bill_date . ", $daysSinceLastInvoice days ago" : 'N/A') . "):";
         foreach ($invoices->take(5) as $invoice) {
-            $prompt[] = "- Factura #{$invoice->bill_invoiceid}, Monto: {$invoice->bill_final_amount}, Estado: {$invoice->bill_status}, Categoría: {$invoice->invoice_category}, Fecha: {$invoice->bill_date}";
+            $prompt[] = "- Invoice #{$invoice->bill_invoiceid}, Amount: {$invoice->bill_final_amount}, Status: {$invoice->bill_status}, Category: {$invoice->invoice_category}, Date: {$invoice->bill_date}";
         }
 
-        $prompt[] = "\nPagos (Total: {$payments->count()}, Último: " . ($lastPayment ? $lastPayment->payment_date . ", hace $daysSinceLastPayment días" : 'N/A') . "):";
+        $prompt[] = "\nPayments (Total: {$payments->count()}, Last: " . ($lastPayment ? $lastPayment->payment_date . ", $daysSinceLastPayment days ago" : 'N/A') . "):";
         foreach ($payments->take(5) as $payment) {
-            $prompt[] = "- Pago #{$payment->payment_id}, Monto: {$payment->payment_amount}, Pasarela: {$payment->payment_gateway}, Fecha: {$payment->payment_date}";
+            $prompt[] = "- Payment #{$payment->payment_id}, Amount: {$payment->payment_amount}, Gateway: {$payment->payment_gateway}, Date: {$payment->payment_date}";
         }
 
-        $prompt[] = "\nAnálisis Mejorado de Feedback:";
-        $prompt[] = "- Total de Entradas de Feedback: {$feedbacks->count()}";
-        $prompt[] = "- Último Feedback: " . ($lastFeedback ? $lastFeedback->feedback_created . ", hace $daysSinceLastFeedback días" : 'N/A');
-        $prompt[] = "- Puntaje Promedio General: {$feedbackSummary['average_score']}";
-        $prompt[] = "- Tendencia del Feedback: {$feedbackSummary['trend']}";
-        $prompt[] = "- Feedback Más Reciente: " . ($lastFeedback ? "\"{$lastFeedback->comment}\"" : 'N/A');
+        $prompt[] = "\nEnhanced Feedback Analysis:";
+        $prompt[] = "- Total Feedback Entries: {$feedbacks->count()}";
+        $prompt[] = "- Last Feedback: " . ($lastFeedback ? $lastFeedback->feedback_created . ", $daysSinceLastFeedback days ago" : 'N/A');
+        $prompt[] = "- Average Overall Score: {$feedbackSummary['average_score']}";
+        $prompt[] = "- Feedback Trend: {$feedbackSummary['trend']}";
+        $prompt[] = "- Most Recent Feedback: " . ($lastFeedback ? "\"{$lastFeedback->comment}\"" : 'N/A');
 
-        $prompt[] = "\nDetalle de Feedback:";
+        $prompt[] = "\nDetailed Feedback Breakdown (last 10 entries):";
         foreach ($feedbackDetails->take(10) as $fd) {
-            $userName = $fd->first_name ? "{$fd->first_name} {$fd->last_name}" : 'Anónimo';
-            $prompt[] = "- Consulta: \"{$fd->query_title}\" - Puntaje: {$fd->value}/{$fd->query_range} (Peso: {$fd->query_weight}) - Usuario: {$userName} - Fecha: {$fd->feedback_date}";
+            $userName = $fd->first_name ? "{$fd->first_name} {$fd->last_name}" : 'Anonymous';
+            $prompt[] = "- Query: \"{$fd->query_title}\" - Score: {$fd->value}/{$fd->query_range} (Weight: {$fd->query_weight}) - User: {$userName} - Date: {$fd->feedback_date}";
         }
 
-        $prompt[] = "\nExpectativas del Cliente (Total: {$expectations->count()}, Última: " . ($lastExpectation ? $lastExpectation->expectation_created . ", hace $daysSinceLastExpectation días" : 'N/A') . "):";
-        $prompt[] = "- Cumplidas: {$expectationsSummary['fulfilled_count']} ({$expectationsSummary['fulfilled_percent']}%)";
-        $prompt[] = "- Pendientes: {$expectationsSummary['pending_count']}";
-        $prompt[] = "- Vencidas: {$expectationsSummary['overdue_count']}";
+        // --- New: Explicit AI instructions for perfect feedback analysis ---
+        $prompt[] = "\nPlease perform a detailed feedback analysis with the following points:";
+        $prompt[] = "1. Summarize the recency and frequency of feedback (e.g., how often feedback is received, any long gaps, last feedback date).";
+        $prompt[] = "2. Calculate and comment on the average feedback score and its trend (improving, declining, or stable).";
+        $prompt[] = "3. Identify the most common positive and negative themes or keywords from the feedback comments.";
+        $prompt[] = "4. Highlight any specific concerns or praise that appear multiple times.";
+        $prompt[] = "5. Provide actionable recommendations for the client relationship based on the feedback data.";
+        $prompt[] = "6. If there are any red flags or urgent issues, mention them clearly.";
+        $prompt[] = "7. Write your analysis in a clear, professional, and actionable style, suitable for a business manager.";
+
+        $prompt[] = "\nClient Expectations (Total: {$expectations->count()}, Last: " . ($lastExpectation ? $lastExpectation->expectation_created . ", $daysSinceLastExpectation days ago" : 'N/A') . "):";
+        $prompt[] = "- Fulfilled: {$expectationsSummary['fulfilled_count']} ({$expectationsSummary['fulfilled_percent']}%)";
+        $prompt[] = "- Pending: {$expectationsSummary['pending_count']}";
+        $prompt[] = "- Overdue: {$expectationsSummary['overdue_count']}";
         foreach ($expectations->take(5) as $exp) {
-            $prompt[] = "- \"{$exp->title}\" (Estado: {$exp->status}, Vence: {$exp->due_date}, Peso: {$exp->weight})";
+            $prompt[] = "- \"{$exp->title}\" (Status: {$exp->status}, Due: {$exp->due_date}, Weight: {$exp->weight})";
         }
 
-        $prompt[] = "\nTickets de Soporte (Total: {$tickets->count()}, Último: " . ($lastTicket ? $lastTicket->ticket_created . ", hace $daysSinceLastTicket días" : 'N/A') . "):";
+        $prompt[] = "\nSupport Tickets (Total: {$tickets->count()}, Last: " . ($lastTicket ? $lastTicket->ticket_created . ", $daysSinceLastTicket days ago" : 'N/A') . "):";
         foreach ($tickets->take(5) as $ticket) {
-            $prompt[] = "- Ticket #{$ticket->ticket_id}, Asunto: {$ticket->ticket_subject}, Estado: {$ticket->ticket_status}, Creado: {$ticket->ticket_created}";
+            $prompt[] = "- Ticket #{$ticket->ticket_id}, Subject: {$ticket->ticket_subject}, Status: {$ticket->ticket_status}, Created: {$ticket->ticket_created}";
         }
 
-        $prompt[] = "\nNotas (Total: {$notes->count()}, Última: " . ($lastNote ? $lastNote->note_created . ", hace $daysSinceLastNote días" : 'N/A') . "):";
+        $prompt[] = "\nNotes (Total: {$notes->count()}, Last: " . ($lastNote ? $lastNote->note_created . ", $daysSinceLastNote days ago" : 'N/A') . "):";
         foreach ($notes->take(5) as $note) {
-            $creator = $note->creator_first_name ? "{$note->creator_first_name} {$note->creator_last_name}" : 'Desconocido';
-            $prompt[] = "- \"{$note->note_title}\": {$note->note_description} (Creado por: {$creator}, Fecha: {$note->note_created})";
+            $creator = $note->creator_first_name ? "{$note->creator_first_name} {$note->creator_last_name}" : 'Unknown';
+            $prompt[] = "- \"{$note->note_title}\": {$note->note_description} (Created by: {$creator}, Date: {$note->note_created})";
         }
 
-        $prompt[] = "\nArchivos (Total: {$files->count()}):";
+        $prompt[] = "\nFiles (Total: {$files->count()}):";
         foreach ($files->take(5) as $file) {
-            $creator = $file->creator_first_name ? "{$file->creator_first_name} {$file->creator_last_name}" : 'Desconocido';
-            $prompt[] = "- {$file->file_filename} (Tipo: {$file->file_type}, Tamaño: {$file->file_size}, Creado por: {$creator})";
+            $creator = $file->creator_first_name ? "{$file->creator_first_name} {$file->creator_last_name}" : 'Unknown';
+            $prompt[] = "- {$file->file_filename} (Type: {$file->file_type}, Size: {$file->file_size}, Created by: {$creator})";
         }
 
-        $prompt[] = "\nEtiquetas:";
+        $prompt[] = "\nTags:";
         if ($tags->count() > 0) {
             foreach ($tags as $tag) {
-            $prompt[] = "- {$tag->tag_title}";
+                $prompt[] = "- {$tag->tag_title}";
             }
         } else {
-            $prompt[] = "- Sin etiquetas asignadas";
+            $prompt[] = "- No tags assigned";
         }
 
-        $prompt[] = "\nEstimaciones (Total: {$estimates->count()}):";
+        $prompt[] = "\nEstimates (Total: {$estimates->count()}):";
         foreach ($estimates->take(3) as $estimate) {
-            $prompt[] = "- Estimación #{$estimate->bill_estimateid}, Monto: {$estimate->bill_final_amount}, Estado: {$estimate->bill_status}, Categoría: {$estimate->estimate_category}";
+            $prompt[] = "- Estimate #{$estimate->bill_estimateid}, Amount: {$estimate->bill_final_amount}, Status: {$estimate->bill_status}, Category: {$estimate->estimate_category}";
         }
 
-        $prompt[] = "\nContratos (Total: {$contracts->count()}):";
+        $prompt[] = "\nContracts (Total: {$contracts->count()}):";
         foreach ($contracts->take(3) as $contract) {
-            $prompt[] = "- Contrato #{$contract->doc_id}, Título: {$contract->doc_title}, Estado: {$contract->doc_status}";
+            $prompt[] = "- Contract #{$contract->doc_id}, Title: {$contract->doc_title}, Status: {$contract->doc_status}";
         }
 
-        $prompt[] = "\nPropuestas (Total: {$proposals->count()}):";
+        $prompt[] = "\nProposals (Total: {$proposals->count()}):";
         foreach ($proposals->take(3) as $proposal) {
-            $prompt[] = "- Propuesta #{$proposal->doc_id}, Título: {$proposal->doc_title}, Estado: {$proposal->doc_status}";
+            $prompt[] = "- Proposal #{$proposal->doc_id}, Title: {$proposal->doc_title}, Status: {$proposal->doc_status}";
         }
 
-        $prompt[] = "\nGastos (Total: {$expenses->count()}):";
+        $prompt[] = "\nExpenses (Total: {$expenses->count()}):";
         foreach ($expenses->take(3) as $expense) {
-            $prompt[] = "- Gasto #{$expense->expense_id}, Monto: {$expense->expense_amount}, Categoría: {$expense->expense_category}, Descripción: {$expense->expense_description}";
+            $prompt[] = "- Expense #{$expense->expense_id}, Amount: {$expense->expense_amount}, Category: {$expense->expense_category}, Description: {$expense->expense_description}";
         }
 
-        $prompt[] = "\nPor favor analiza este cliente y proporciona:";
-        $prompt[] = "1️⃣ Un resumen integral del estado actual del cliente y su relación con nosotros.";
-        $prompt[] = "📊 Principales hallazgos del análisis de feedback, incluyendo tendencias de satisfacción y preocupaciones específicas.";
-        $prompt[] = "💰 Evaluación de salud financiera basada en el historial de pagos y saldos pendientes.";
-        $prompt[] = "⚠️ Evaluación de riesgos basada en expectativas, estado de proyectos y patrones de comunicación.";
-        $prompt[] = "🛠️ Recomendaciones específicas para mejorar la satisfacción y retención del cliente.";
-        $prompt[] = "📈 Oportunidades para ventas adicionales o expansión de servicios según sus necesidades.";
-        $prompt[] = "🚨 Cualquier alerta o área que requiera atención inmediata.";
-
+        $prompt[] = "\nPlease analyze this client and provide:";
+        $prompt[] = "1. A comprehensive summary of the client's current status and relationship with us.";
+        $prompt[] = "2. Key insights from feedback analysis, including satisfaction trends and specific concerns.";
+        $prompt[] = "3. Financial health assessment based on payment history and outstanding balances.";
+        $prompt[] = "4. Risk assessment based on expectations, project status, and communication patterns.";
+        $prompt[] = "5. Specific recommendations for improving client satisfaction and retention.";
+        $prompt[] = "6. Opportunities for upselling or expanding services based on their needs.";
+        $prompt[] = "7. Any red flags or areas requiring immediate attention.";
 
         return implode("\n", $prompt);
     }
@@ -612,21 +533,20 @@ class ClientAIRepository
         $comments = $feedbacks->pluck('comment')->toArray();
 
         $prompt = [];
-        $prompt[] = "Eres un analista de negocios experto en IA. Aquí está el historial de comentarios de este cliente:";
+        $prompt[] = "You are an expert business analyst AI. Here is the feedback history for this client:";
         foreach ($feedbacks as $fb) {
-            $prompt[] = "- Fecha: {$fb->feedback_created}, Comentario: \"{$fb->comment}\"";
+            $prompt[] = "- Date: {$fb->feedback_created}, Comment: \"{$fb->comment}\"";
         }
-        $prompt[] = "\nPor favor analiza lo siguiente en un formato de tabla estructurada:";
-        $prompt[] = "| Objetivo              | Descripción                                           |";
+        $prompt[] = "\nPlease analyze the following in a structured table format:";
+        $prompt[] = "| Goal                  | Description                                           |";
         $prompt[] = "| --------------------- | ----------------------------------------------------- |";
-        $prompt[] = "| **Sentimiento**       | ¿Es positivo, neutral o negativo?                     |";
-        $prompt[] = "| **Temas/Palabras clave** | ¿Qué mencionaron? (velocidad, calidad, diseño, etc.) |";
-        $prompt[] = "| **Tono emocional**    | ¿Están entusiastas, decepcionados, neutrales?         |";
-        $prompt[] = "| **Puntos accionables**| ¿Qué debería mejorarse o enfatizarse más?            |";
-        $prompt[] = "| **Tipo de cliente**   | ¿Amistoso? ¿Exigente? ¿Tono corporativo?              |";
-        $prompt[] = "\nPara cada objetivo, proporciona una descripción detallada y accionable basada en los comentarios anteriores. Escribe tu análisis de manera clara, profesional y accionable.";
+        $prompt[] = "| **Sentiment**         | Is it positive, neutral, or negative?                 |";
+        $prompt[] = "| **Topics/Keywords**   | What did they mention? (speed, quality, design, etc.) |";
+        $prompt[] = "| **Emotion tone**      | Are they enthusiastic, disappointed, neutral?         |";
+        $prompt[] = "| **Actionable points** | What should be improved or emphasized more?           |";
+        $prompt[] = "| **Client type**       | Friendly? Demanding? Corporate tone?                  |";
+        $prompt[] = "\nFor each goal, provide a detailed, actionable description based on the feedback above. Write your analysis in a clear, professional, and actionable style.";
         return implode("\n", $prompt);
-
     }
 
     /**
@@ -639,18 +559,17 @@ class ClientAIRepository
             ->orderByDesc('expectation_created')
             ->get();
         $prompt = [];
-        $prompt[] = "Eres un analista de negocios experto en IA. Aquí está el historial de expectativas de este cliente:";
+        $prompt[] = "You are an expert business analyst AI. Here is the expectations history for this client:";
         foreach ($expectations->take(10) as $exp) {
-            $prompt[] = "- Título: {$exp->title}, Estado: {$exp->status}, Vencimiento: {$exp->due_date}, Creado: {$exp->expectation_created}";
+            $prompt[] = "- Title: {$exp->title}, Status: {$exp->status}, Due: {$exp->due_date}, Created: {$exp->expectation_created}";
         }
-        $prompt[] = "\nPor favor, analiza lo siguiente:";
-        $prompt[] = "1. Avance de las expectativas (cumplidas, pendientes, vencidas).";
-        $prompt[] = "2. Cualquier patrón o demora en el cumplimiento de expectativas.";
-        $prompt[] = "3. Recomendaciones accionables para mejorar la gestión de expectativas.";
-        $prompt[] = "4. Cualquier señal de alerta o problema urgente.";
-        $prompt[] = "Escribe tu análisis de manera clara, profesional y accionable.";
+        $prompt[] = "\nPlease analyze the following:";
+        $prompt[] = "1. Progress on expectations (fulfilled, pending, overdue).";
+        $prompt[] = "2. Any patterns or delays in meeting expectations.";
+        $prompt[] = "3. Actionable recommendations for improving expectation management.";
+        $prompt[] = "4. Any red flags or urgent issues.";
+        $prompt[] = "Write your analysis in a clear, professional, and actionable style.";
         return implode("\n", $prompt);
-
     }
 
     /**
@@ -663,18 +582,17 @@ class ClientAIRepository
             ->orderByDesc('project_created')
             ->get();
         $prompt = [];
-        $prompt[] = "Eres un analista de negocios experto en IA. Aquí está el historial de proyectos de este cliente:";
+        $prompt[] = "You are an expert business analyst AI. Here is the project history for this client:";
         foreach ($projects->take(10) as $p) {
-            $prompt[] = "- Título: {$p->project_title}, Estado: {$p->project_status}, Creado: {$p->project_created}, Vencimiento: {$p->project_date_due}";
+            $prompt[] = "- Title: {$p->project_title}, Status: {$p->project_status}, Created: {$p->project_created}, Due: {$p->project_date_due}";
         }
-        $prompt[] = "\nPor favor, analiza lo siguiente:";
-        $prompt[] = "1. Elementos vencidos o próximos plazos.";
-        $prompt[] = "2. Patrones en la finalización o demoras de proyectos.";
-        $prompt[] = "3. Recomendaciones accionables para la gestión de proyectos.";
-        $prompt[] = "4. Cualquier señal de alerta o problema urgente.";
-        $prompt[] = "Escribe tu análisis de manera breve, clara, profesional y accionable.";
+        $prompt[] = "\nPlease analyze the following:";
+        $prompt[] = "1. Overdue items or upcoming deadlines.";
+        $prompt[] = "2. Patterns in project completion or delays.";
+        $prompt[] = "3. Actionable recommendations for project management.";
+        $prompt[] = "4. Any red flags or urgent issues.";
+        $prompt[] = "Write your analysis in a clear, professional, and actionable style.";
         return implode("\n", $prompt);
-
     }
 
     /**
@@ -695,17 +613,618 @@ class ClientAIRepository
             return !$hasReply;
         });
         $prompt = [];
-        $prompt[] = "Eres un analista de negocios experto en IA. Aquí están los comentarios del cliente que pueden necesitar atención:";
+        $prompt[] = "You are an expert business analyst AI. Here are the client comments that may need attention:";
         foreach ($unanswered->take(10) as $fb) {
-            $prompt[] = "- Fecha: {$fb->feedback_created}, Comentario: \"{$fb->comment}\"";
+            $prompt[] = "- Date: {$fb->feedback_created}, Comment: \"{$fb->comment}\"";
         }
-        $prompt[] = "\nPor favor analiza lo siguiente:";
-        $prompt[] = "1. Identifica los comentarios que no han sido respondidos.";
-        $prompt[] = "2. Sugiere cómo abordar estos comentarios y mejorar la comunicación.";
-        $prompt[] = "3. Cualquier señal de alerta o problema urgente.";
-        $prompt[] = "Escribe tu análisis de manera breve, clara, profesional y accionable.";
+        $prompt[] = "\nPlease analyze the following:";
+        $prompt[] = "1. Identify any comments that have not been answered.";
+        $prompt[] = "2. Suggest how to address these comments and improve communication.";
+        $prompt[] = "3. Any red flags or urgent issues.";
+        $prompt[] = "Write your analysis in a clear, professional, and actionable style.";
         return implode("\n", $prompt);
+    }
 
+    /**
+     * Get aggregated customer health data by period.
+     */
+    public function getClientHealthReportData($clientId, $period = 'week')
+    {
+        [$startDate, $endDate, $label] = $this->resolvePeriodWindow($period);
+
+        $clientStageTitle = 'Sin etapa';
+        $clientStageDescription = '';
+        if (Schema::hasTable('client_stages') && Schema::hasColumn('clients', 'client_stage_id')) {
+            $stageData = DB::table('clients')
+                ->leftJoin('client_stages', 'client_stages.client_stage_id', '=', 'clients.client_stage_id')
+                ->select('client_stages.client_stage_title', 'client_stages.client_stage_description')
+                ->where('clients.client_id', $clientId)
+                ->first();
+
+            if ($stageData && !empty($stageData->client_stage_title)) {
+                $clientStageTitle = (string) $stageData->client_stage_title;
+                $clientStageDescription = (string) ($stageData->client_stage_description ?? '');
+            }
+        }
+
+        $notes = DB::table('notes')
+            ->where('noteresource_type', 'client')
+            ->where('noteresource_id', $clientId)
+            ->whereBetween('note_created', [$startDate, $endDate])
+            ->orderByDesc('note_created')
+            ->get();
+
+        $minutas = DB::table('client_minutas')
+            ->select('client_minuta_id', 'minuta_date', 'minuta_detail', 'minuta_creatorid')
+            ->where('client_id', $clientId)
+            ->whereBetween('minuta_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->orderByDesc('minuta_date')
+            ->get();
+
+        $capacitaciones = DB::table('client_capacitaciones')
+            ->select(
+                'client_capacitacion_id',
+                'capacitacion_date',
+                'capacitacion_mode',
+                'capacitacion_participants',
+                'capacitacion_topics',
+                'capacitacion_observations'
+            )
+            ->where('client_id', $clientId)
+            ->whereBetween('capacitacion_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->orderByDesc('capacitacion_date')
+            ->get();
+
+        $tasks = DB::table('tasks')
+            ->join('projects', 'projects.project_id', '=', 'tasks.task_projectid')
+            ->select('tasks.task_id', 'tasks.task_title', 'tasks.task_status', 'tasks.task_created', 'tasks.task_updated', 'tasks.task_date_due')
+            ->where('projects.project_clientid', $clientId)
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('tasks.task_created', [$startDate, $endDate])
+                    ->orWhereBetween('tasks.task_updated', [$startDate, $endDate]);
+            })
+            ->get();
+
+        $completedTasks = $tasks->filter(function ($task) {
+            $status = strtolower((string) ($task->task_status ?? ''));
+            return in_array($status, ['2', 'completed', 'complete', 'done', 'closed'], true);
+        });
+
+        $completedTasksCount = $completedTasks->count();
+        $pendingTasks = $tasks->count() - $completedTasksCount;
+
+        $comments = DB::table('feedbacks')
+            ->select('feedback_id', 'comment', 'feedback_created')
+            ->where('client_id', $clientId)
+            ->whereNotNull('comment')
+            ->where('comment', '!=', '')
+            ->whereBetween('feedback_created', [$startDate, $endDate])
+            ->orderByDesc('feedback_created')
+            ->get();
+
+        $expectations = DB::table('client_expectations')
+            ->select('title', 'status', 'due_date', 'expectation_created', 'expectation_updated')
+            ->where('client_id', $clientId)
+            ->whereBetween('expectation_created', [$startDate, $endDate])
+            ->orderByDesc('expectation_created')
+            ->get();
+
+        $expectationsFulfilled = $expectations->filter(function ($item) {
+            return strtolower((string) ($item->status ?? '')) === 'fulfilled';
+        });
+        $expectationsFulfilledCount = $expectationsFulfilled->count();
+
+        $tenantBaseUrl = rtrim((string) url('/'), '/');
+        $completedTasksWithLinks = $completedTasks->map(function ($task) use ($tenantBaseUrl) {
+            $task->task_link = $tenantBaseUrl . '/tasks/v/' . $task->task_id;
+            return $task;
+        })->values();
+
+        $expectationsFulfilledWithLinks = $expectationsFulfilled->map(function ($expectation) use ($tenantBaseUrl, $clientId) {
+            $expectation->expectation_link = $tenantBaseUrl . '/clients/' . $clientId . '/expectativas';
+            return $expectation;
+        })->values();
+
+        $feedbacks = DB::table('feedbacks')
+            ->select('feedback_id', 'feedback_created', 'comment')
+            ->where('client_id', $clientId)
+            ->whereBetween('feedback_created', [$startDate, $endDate])
+            ->orderByDesc('feedback_created')
+            ->get();
+
+        $feedbackLast3MonthsCount = DB::table('feedbacks')
+            ->where('client_id', $clientId)
+            ->where('feedback_created', '>=', Carbon::now()->subMonths(3))
+            ->count();
+
+        $expectationsLast3MonthsCount = DB::table('client_expectations')
+            ->where('client_id', $clientId)
+            ->where('expectation_created', '>=', Carbon::now()->subMonths(3))
+            ->count();
+
+        $minutasLast3MonthsCount = DB::table('client_minutas')
+            ->where('client_id', $clientId)
+            ->where('minuta_date', '>=', Carbon::now()->subMonths(3)->toDateString())
+            ->count();
+
+        $feedbackDetails = DB::table('feedback_details')
+            ->join('feedbacks', 'feedbacks.feedback_id', '=', 'feedback_details.feedback_id')
+            ->join('feedback_queries', 'feedback_queries.feedback_query_id', '=', 'feedback_details.feedback_query_id')
+            ->select(
+                'feedback_details.feedback_id',
+                'feedback_details.value',
+                'feedback_queries.weight as query_weight',
+                'feedback_queries.range as query_range'
+            )
+            ->where('feedbacks.client_id', $clientId)
+            ->whereBetween('feedbacks.feedback_created', [$startDate, $endDate])
+            ->get();
+
+        $feedbackSummary = $this->calculateFeedbackSummary($feedbackDetails);
+
+        return [
+            'period' => $period,
+            'period_label' => $label,
+            'date_start' => $startDate->toDateString(),
+            'date_end' => $endDate->toDateString(),
+            'client_stage_title' => $clientStageTitle,
+            'client_stage_description' => $clientStageDescription,
+            'notes' => $notes,
+            'minutas' => $minutas,
+            'minutas_count' => $minutas->count(),
+            'capacitaciones' => $capacitaciones,
+            'capacitaciones_count' => $capacitaciones->count(),
+            'tasks_total' => $tasks->count(),
+            'tasks_completed' => $completedTasksCount,
+            'tasks_pending' => $pendingTasks,
+            'tasks_completed_items' => $completedTasksWithLinks,
+            'comments' => $comments,
+            'expectations' => $expectations,
+            'expectations_total' => $expectations->count(),
+            'expectations_fulfilled' => $expectationsFulfilledCount,
+            'expectations_fulfilled_items' => $expectationsFulfilledWithLinks,
+            'feedbacks' => $feedbacks,
+            'feedback_count' => $feedbacks->count(),
+            'feedback_average' => $feedbackSummary['average_score'],
+            'feedback_trend' => $feedbackSummary['trend'],
+            'expectations_last_3_months_count' => $expectationsLast3MonthsCount,
+            'has_expectation_last_3_months' => $expectationsLast3MonthsCount > 0,
+            'feedback_last_3_months_count' => $feedbackLast3MonthsCount,
+            'has_feedback_last_3_months' => $feedbackLast3MonthsCount > 0,
+            'minutas_last_3_months_count' => $minutasLast3MonthsCount,
+            'has_minuta_last_3_months' => $minutasLast3MonthsCount > 0,
+        ];
+    }
+
+    /**
+     * Build AI prompt for customer success health report.
+     */
+    public function generateClientHealthAnalysisPrompt($clientId, $period = 'week')
+    {
+        $client = DB::table('clients')
+            ->select('client_id', 'client_company_name', 'client_status', 'client_description')
+            ->where('client_id', $clientId)
+            ->first();
+
+        $healthData = $this->getClientHealthReportData($clientId, $period);
+
+        $prompt = [];
+        $prompt[] = "Eres especialista en Éxito del Cliente y análisis de salud de cuentas.";
+        $prompt[] = "Genera un informe ejecutivo de salud del cliente para el período {$healthData['period_label']} ({$healthData['date_start']} a {$healthData['date_end']}).";
+        $prompt[] = "";
+        $prompt[] = "Cliente:";
+        $prompt[] = "- Nombre: " . ($client->client_company_name ?? 'N/A');
+        $prompt[] = "- Estado: " . ($client->client_status ?? 'N/A');
+        $prompt[] = "- Descripción: " . ($client->client_description ?? 'N/A');
+        $prompt[] = "- Etapa actual: " . ($healthData['client_stage_title'] ?? 'Sin etapa');
+        $prompt[] = "- Descripción de etapa: " . (!empty($healthData['client_stage_description']) ? $healthData['client_stage_description'] : 'No definida');
+        $prompt[] = "";
+        $prompt[] = "Instrucción clave de análisis por etapa:";
+        $prompt[] = "- Debes ajustar diagnóstico, riesgos, recomendaciones y próximos pasos según la etapa actual del cliente.";
+        $prompt[] = "- No uses el mismo criterio para todas las etapas (ej: Implementación requiere foco distinto a Adopción).";
+        $prompt[] = "";
+        $prompt[] = "Datos base del período:";
+        $prompt[] = "- Notas registradas: " . count($healthData['notes']);
+        $prompt[] = "- Minutas registradas: " . ($healthData['minutas_count'] ?? 0);
+        $prompt[] = "- Capacitaciones registradas: " . ($healthData['capacitaciones_count'] ?? 0);
+        $prompt[] = "- Tareas totales: {$healthData['tasks_total']}";
+        $prompt[] = "- Tareas completadas: {$healthData['tasks_completed']}";
+        $prompt[] = "- Tareas pendientes: {$healthData['tasks_pending']}";
+        $prompt[] = "- Comentarios del cliente: " . count($healthData['comments']);
+        $prompt[] = "- Expectativas cargadas: {$healthData['expectations_total']}";
+        $prompt[] = "- Expectativas cumplidas: {$healthData['expectations_fulfilled']}";
+        $prompt[] = "- Feedbacks: {$healthData['feedback_count']}";
+        $prompt[] = "- Score promedio de feedback: {$healthData['feedback_average']}";
+        $prompt[] = "- Tendencia de feedback: {$healthData['feedback_trend']}";
+        $prompt[] = "";
+        $prompt[] = "Detalle breve (máximo 5 ítems por sección):";
+        $prompt[] = "Notas:";
+        foreach (collect($healthData['notes'])->take(5) as $note) {
+            $prompt[] = "- {$note->note_created}: " . trim(($note->note_title ?? '') . ' ' . ($note->note_description ?? ''));
+        }
+        $prompt[] = "Minutas:";
+        foreach (collect($healthData['minutas'] ?? [])->take(5) as $minuta) {
+            $detalle = trim((string)($minuta->minuta_detail ?? ''));
+            $prompt[] = "- {$minuta->minuta_date}: " . mb_strimwidth($detalle, 0, 220, '...');
+        }
+        $prompt[] = "Capacitaciones:";
+        foreach (collect($healthData['capacitaciones'] ?? [])->take(5) as $capacitacion) {
+            $modo = strtoupper((string)($capacitacion->capacitacion_mode ?? 'N/A'));
+            $participantes = trim((string)($capacitacion->capacitacion_participants ?? ''));
+            $temas = trim((string)($capacitacion->capacitacion_topics ?? ''));
+            $prompt[] = "- {$capacitacion->capacitacion_date} [{$modo}] Participantes: {$participantes}. Temas: " . mb_strimwidth($temas, 0, 180, '...');
+        }
+        $prompt[] = "Comentarios:";
+        foreach (collect($healthData['comments'])->take(5) as $comment) {
+            $prompt[] = "- {$comment->feedback_created}: \"{$comment->comment}\"";
+        }
+        $prompt[] = "Expectativas:";
+        foreach (collect($healthData['expectations'])->take(5) as $expectation) {
+            $prompt[] = "- {$expectation->title} (estado: {$expectation->status}, vencimiento: {$expectation->due_date})";
+        }
+        $prompt[] = "Tareas completadas en el período (con link):";
+        foreach (collect($healthData['tasks_completed_items'] ?? [])->take(10) as $task) {
+            $prompt[] = "- [" . trim((string)($task->task_title ?? 'Tarea sin título')) . "](" . ($task->task_link ?? '') . ")";
+        }
+        $prompt[] = "Expectativas cumplidas en el período (con link):";
+        foreach (collect($healthData['expectations_fulfilled_items'] ?? [])->take(10) as $expectation) {
+            $prompt[] = "- [" . trim((string)($expectation->title ?? 'Expectativa')) . "](" . ($expectation->expectation_link ?? '') . ")";
+        }
+        $prompt[] = "";
+        $prompt[] = "Devuelve un INFORME BREVE (aplica igual para Última semana, Último mes y Último trimestre).";
+        $prompt[] = "Máximo 12-15 líneas en total. Sin introducciones largas.";
+        $prompt[] = "";
+        $prompt[] = "Usa exactamente esta estructura:";
+        $prompt[] = "1) Qué se hizo en el período (3 bullets máximo).";
+        $prompt[] = "2) Qué se habló en reuniones (solo si hay minutas en el período; si no hay, escribir 'Sin minutas en este período').";
+        $prompt[] = "3) Qué avanzamos esta semana/mes/trimestre (3 bullets concretos).";
+        $prompt[] = "4) Qué nos faltó esta semana/mes/trimestre (3 bullets concretos y accionables).";
+        $prompt[] = "5) Próximo foco inmediato (1-2 acciones con responsable sugerido y fecha objetivo).";
+        $prompt[] = "";
+        $prompt[] = "Reglas:";
+        $prompt[] = "- Prioriza claridad operativa para el equipo.";
+        $prompt[] = "- Ajusta el análisis a la etapa actual del cliente.";
+        $prompt[] = "- No inventes datos si faltan evidencias en notas/minutas/tareas/feedback.";
+        $prompt[] = "- En 'Qué avanzamos' y/o 'Qué se hizo', menciona explícitamente tareas y expectativas completadas con links en formato markdown [Título](URL) cuando existan.";
+
+        return implode("\n", $prompt);
+    }
+
+    /**
+     * Build meeting preparation dataset based on events since last meeting (minuta).
+     */
+    public function getMeetingPreparationData($clientId, $fallbackDays = 60)
+    {
+        $fallbackDays = (int) $fallbackDays > 0 ? (int) $fallbackDays : 60;
+        $now = Carbon::now();
+
+        $clientQuery = DB::table('clients')
+            ->select('clients.client_id', 'clients.client_company_name', 'clients.client_status', 'clients.client_description', 'clients.client_created')
+            ->where('clients.client_id', $clientId);
+
+        if (Schema::hasTable('client_stages') && Schema::hasColumn('clients', 'client_stage_id')) {
+            $clientQuery->leftJoin('client_stages', 'client_stages.client_stage_id', '=', 'clients.client_stage_id')
+                ->addSelect('client_stages.client_stage_title', 'client_stages.client_stage_description');
+        } else {
+            $clientQuery->addSelect(DB::raw("'Sin etapa' as client_stage_title"), DB::raw("'' as client_stage_description"));
+        }
+
+        $client = $clientQuery->first();
+
+        $lastMinuta = DB::table('client_minutas')
+            ->select('client_minuta_id', 'minuta_date', 'minuta_detail')
+            ->where('client_id', $clientId)
+            ->orderByDesc('minuta_date')
+            ->orderByDesc('client_minuta_id')
+            ->first();
+
+        $referenceDate = $lastMinuta
+            ? Carbon::parse($lastMinuta->minuta_date)->startOfDay()
+            : $now->copy()->subDays($fallbackDays)->startOfDay();
+
+        $stageChanges = collect([]);
+        if (Schema::hasTable('client_stage_histories') && Schema::hasTable('client_stages')) {
+            $stageChanges = DB::table('client_stage_histories as h')
+                ->leftJoin('client_stages as from_stage', 'from_stage.client_stage_id', '=', 'h.from_stage_id')
+                ->leftJoin('client_stages as to_stage', 'to_stage.client_stage_id', '=', 'h.to_stage_id')
+                ->select(
+                    'h.changed_at',
+                    'from_stage.client_stage_title as from_stage_title',
+                    'to_stage.client_stage_title as to_stage_title'
+                )
+                ->where('h.client_id', $clientId)
+                ->where('h.changed_at', '>=', $referenceDate)
+                ->orderByDesc('h.changed_at')
+                ->get();
+        }
+
+        $minutasSinceReference = DB::table('client_minutas')
+            ->select('client_minuta_id', 'minuta_date', 'minuta_detail')
+            ->where('client_id', $clientId)
+            ->where('minuta_date', '>', $referenceDate->toDateString())
+            ->orderByDesc('minuta_date')
+            ->get();
+
+        $capacitacionesSinceReference = DB::table('client_capacitaciones')
+            ->select('client_capacitacion_id', 'capacitacion_date', 'capacitacion_mode', 'capacitacion_topics', 'capacitacion_participants')
+            ->where('client_id', $clientId)
+            ->where('capacitacion_date', '>=', $referenceDate->toDateString())
+            ->orderByDesc('capacitacion_date')
+            ->get();
+
+        $tasksSinceReference = DB::table('tasks')
+            ->join('projects', 'projects.project_id', '=', 'tasks.task_projectid')
+            ->select('tasks.task_id', 'tasks.task_title', 'tasks.task_status', 'tasks.task_created', 'tasks.task_date_due')
+            ->where('projects.project_clientid', $clientId)
+            ->where('tasks.task_created', '>=', $referenceDate)
+            ->orderByDesc('tasks.task_created')
+            ->get();
+
+        $tasksCompleted = $tasksSinceReference->filter(function ($task) {
+            $status = strtolower((string) ($task->task_status ?? ''));
+            return in_array($status, ['2', 'completed', 'complete', 'done', 'closed'], true);
+        });
+        $tasksPending = $tasksSinceReference->filter(function ($task) {
+            $status = strtolower((string) ($task->task_status ?? ''));
+            return !in_array($status, ['2', 'completed', 'complete', 'done', 'closed'], true);
+        });
+
+        $tenantBaseUrl = rtrim((string) url('/'), '/');
+        $tasksCompletedWithLinks = $tasksCompleted->map(function ($task) use ($tenantBaseUrl) {
+            $task->task_link = $tenantBaseUrl . '/tasks/v/' . $task->task_id;
+            return $task;
+        })->values();
+        $tasksPendingWithLinks = $tasksPending->map(function ($task) use ($tenantBaseUrl) {
+            $task->task_link = $tenantBaseUrl . '/tasks/v/' . $task->task_id;
+            return $task;
+        })->values();
+
+        $expectationsSinceReference = DB::table('client_expectations')
+            ->select('title', 'status', 'due_date', 'expectation_created', 'expectation_updated')
+            ->where('client_id', $clientId)
+            ->where(function ($query) use ($referenceDate) {
+                $query->where('expectation_created', '>=', $referenceDate)
+                    ->orWhere('expectation_updated', '>=', $referenceDate);
+            })
+            ->orderByDesc('expectation_updated')
+            ->orderByDesc('expectation_created')
+            ->get();
+
+        $expectationsOverdue = DB::table('client_expectations')
+            ->select('title', 'status', 'due_date')
+            ->where('client_id', $clientId)
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<', $now->toDateString())
+            ->where('status', '!=', 'fulfilled')
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        $feedbackSinceReference = DB::table('feedbacks')
+            ->select('feedback_id', 'feedback_created', 'comment')
+            ->where('client_id', $clientId)
+            ->where('feedback_created', '>=', $referenceDate)
+            ->orderByDesc('feedback_created')
+            ->get();
+
+        $commentsSinceReference = $feedbackSinceReference->filter(function ($item) {
+            return !empty(trim((string) ($item->comment ?? '')));
+        })->values();
+
+        $implementationReferenceDate = null;
+        $implementationReferenceLabel = 'Sin hito de Implementación';
+
+        if (Schema::hasTable('client_stage_histories') && Schema::hasTable('client_stages')) {
+            $implementationEntry = DB::table('client_stage_histories as h')
+                ->join('client_stages as to_stage', 'to_stage.client_stage_id', '=', 'h.to_stage_id')
+                ->select('h.changed_at', 'to_stage.client_stage_title')
+                ->where('h.client_id', $clientId)
+                ->whereRaw('LOWER(to_stage.client_stage_title) LIKE ?', ['%implement%'])
+                ->orderByDesc('h.changed_at')
+                ->first();
+
+            if ($implementationEntry && !empty($implementationEntry->changed_at)) {
+                $implementationReferenceDate = Carbon::parse($implementationEntry->changed_at)->startOfDay();
+                $implementationReferenceLabel = 'Desde entrada a Implementación';
+            }
+        }
+
+        if (!$implementationReferenceDate && !empty($client->client_stage_title) && stripos((string) $client->client_stage_title, 'implement') !== false) {
+            if (!empty($client->client_created)) {
+                $implementationReferenceDate = Carbon::parse($client->client_created)->startOfDay();
+                $implementationReferenceLabel = 'Cliente en Implementación (sin histórico, desde alta)';
+            }
+        }
+
+        $tasksSinceImplementation = collect([]);
+        $tasksCompletedSinceImplementation = collect([]);
+        $tasksInProgressSinceImplementation = collect([]);
+        $minutasSinceImplementation = collect([]);
+        $feedbackSinceImplementation = collect([]);
+        $expectationsSinceImplementation = collect([]);
+
+        if ($implementationReferenceDate) {
+            $tasksSinceImplementation = DB::table('tasks')
+                ->join('projects', 'projects.project_id', '=', 'tasks.task_projectid')
+                ->select('tasks.task_id', 'tasks.task_title', 'tasks.task_status', 'tasks.task_created')
+                ->where('projects.project_clientid', $clientId)
+                ->where('tasks.task_created', '>=', $implementationReferenceDate)
+                ->orderByDesc('tasks.task_created')
+                ->get();
+
+            $tasksCompletedSinceImplementation = $tasksSinceImplementation->filter(function ($task) {
+                $status = strtolower((string) ($task->task_status ?? ''));
+                return in_array($status, ['2', 'completed', 'complete', 'done', 'closed'], true);
+            })->values();
+
+            $tasksInProgressSinceImplementation = $tasksSinceImplementation->filter(function ($task) {
+                $status = strtolower((string) ($task->task_status ?? ''));
+                return !in_array($status, ['2', 'completed', 'complete', 'done', 'closed'], true);
+            })->values();
+
+            $minutasSinceImplementation = DB::table('client_minutas')
+                ->select('client_minuta_id')
+                ->where('client_id', $clientId)
+                ->where('minuta_date', '>=', $implementationReferenceDate->toDateString())
+                ->get();
+
+            $feedbackSinceImplementation = DB::table('feedbacks')
+                ->select('feedback_id')
+                ->where('client_id', $clientId)
+                ->where('feedback_created', '>=', $implementationReferenceDate)
+                ->get();
+
+            $expectationsSinceImplementation = DB::table('client_expectations')
+                ->select('title')
+                ->where('client_id', $clientId)
+                ->where(function ($query) use ($implementationReferenceDate) {
+                    $query->where('expectation_created', '>=', $implementationReferenceDate)
+                        ->orWhere('expectation_updated', '>=', $implementationReferenceDate);
+                })
+                ->get();
+        }
+
+        return [
+            'client' => $client,
+            'reference_date' => $referenceDate->toDateString(),
+            'reference_label' => $lastMinuta ? 'Desde la última reunión (minuta)' : "Sin minuta previa (últimos {$fallbackDays} días)",
+            'implementation_reference_date' => $implementationReferenceDate ? $implementationReferenceDate->toDateString() : null,
+            'implementation_reference_label' => $implementationReferenceLabel,
+            'last_minuta' => $lastMinuta,
+            'stage_changes' => $stageChanges,
+            'minutas_since_reference' => $minutasSinceReference,
+            'capacitaciones_since_reference' => $capacitacionesSinceReference,
+            'tasks_since_reference_total' => $tasksSinceReference->count(),
+            'tasks_completed_since_reference' => $tasksCompleted->count(),
+            'tasks_pending_since_reference' => $tasksPending->count(),
+            'tasks_completed_items' => $tasksCompletedWithLinks,
+            'tasks_in_progress_items' => $tasksPendingWithLinks,
+            'expectations_since_reference' => $expectationsSinceReference,
+            'expectations_overdue' => $expectationsOverdue,
+            'feedback_since_reference' => $feedbackSinceReference,
+            'comments_since_reference' => $commentsSinceReference,
+            'tasks_since_implementation_total' => count($tasksSinceImplementation),
+            'tasks_completed_since_implementation' => count($tasksCompletedSinceImplementation),
+            'tasks_pending_since_implementation' => count($tasksInProgressSinceImplementation),
+            'minutas_since_implementation_count' => count($minutasSinceImplementation),
+            'feedback_since_implementation_count' => count($feedbackSinceImplementation),
+            'expectations_since_implementation_count' => count($expectationsSinceImplementation),
+        ];
+    }
+
+    /**
+     * Build AI prompt for meeting preparation brief.
+     */
+    public function generateMeetingPreparationPrompt($clientId, $fallbackDays = 60)
+    {
+        $data = $this->getMeetingPreparationData($clientId, $fallbackDays);
+        $client = $data['client'];
+
+        $prompt = [];
+        $prompt[] = 'Eres especialista en Customer Success y preparación de reuniones con clientes.';
+        $prompt[] = 'Genera un informe breve y accionable para preparar la próxima reunión.';
+        $prompt[] = '';
+        $prompt[] = 'Contexto del cliente:';
+        $prompt[] = '- Nombre: ' . ($client->client_company_name ?? 'N/A');
+        $prompt[] = '- Estado: ' . ($client->client_status ?? 'N/A');
+        $prompt[] = '- Etapa actual: ' . ($client->client_stage_title ?? 'Sin etapa');
+        $prompt[] = '- Descripción de etapa: ' . (!empty($client->client_stage_description ?? '') ? $client->client_stage_description : 'No definida');
+        $prompt[] = '- Marco temporal: ' . ($data['reference_label'] ?? 'Desde última referencia') . ' (' . ($data['reference_date'] ?? 'N/A') . ' a hoy)';
+        if (!empty($data['implementation_reference_date'])) {
+            $prompt[] = '- Segundo marco temporal: ' . ($data['implementation_reference_label'] ?? 'Desde Implementación') . ' (' . $data['implementation_reference_date'] . ' a hoy)';
+        }
+        $prompt[] = '';
+
+        if (!empty($data['last_minuta'])) {
+            $prompt[] = 'Última minuta registrada:';
+            $prompt[] = '- Fecha: ' . $data['last_minuta']->minuta_date;
+            $prompt[] = '- Resumen: ' . mb_strimwidth(trim((string)($data['last_minuta']->minuta_detail ?? '')), 0, 260, '...');
+            $prompt[] = '';
+        }
+
+        $prompt[] = 'Evolución desde la referencia:';
+        $prompt[] = '- Cambios de etapa: ' . count($data['stage_changes'] ?? []);
+        $prompt[] = '- Minutas nuevas: ' . count($data['minutas_since_reference'] ?? []);
+        $prompt[] = '- Capacitaciones: ' . count($data['capacitaciones_since_reference'] ?? []);
+        $prompt[] = '- Tareas completadas: ' . ($data['tasks_completed_since_reference'] ?? 0);
+        $prompt[] = '- Tareas pendientes: ' . ($data['tasks_pending_since_reference'] ?? 0);
+        $prompt[] = '- Expectativas nuevas/actualizadas: ' . count($data['expectations_since_reference'] ?? []);
+        $prompt[] = '- Expectativas vencidas: ' . count($data['expectations_overdue'] ?? []);
+        $prompt[] = '- Feedbacks: ' . count($data['feedback_since_reference'] ?? []);
+        $prompt[] = '- Comentarios con texto: ' . count($data['comments_since_reference'] ?? []);
+        $prompt[] = '';
+
+        if (!empty($data['implementation_reference_date'])) {
+            $prompt[] = 'Evolución desde Implementación:';
+            $prompt[] = '- Tareas totales: ' . ($data['tasks_since_implementation_total'] ?? 0);
+            $prompt[] = '- Tareas completadas: ' . ($data['tasks_completed_since_implementation'] ?? 0);
+            $prompt[] = '- Tareas en proceso: ' . ($data['tasks_pending_since_implementation'] ?? 0);
+            $prompt[] = '- Minutas: ' . ($data['minutas_since_implementation_count'] ?? 0);
+            $prompt[] = '- Feedbacks: ' . ($data['feedback_since_implementation_count'] ?? 0);
+            $prompt[] = '- Expectativas nuevas/actualizadas: ' . ($data['expectations_since_implementation_count'] ?? 0);
+            $prompt[] = '';
+        }
+
+        $prompt[] = 'Detalle breve de eventos (máximo 5 por sección):';
+        $prompt[] = 'Cambios de etapa:';
+        foreach (collect($data['stage_changes'] ?? [])->take(5) as $change) {
+            $prompt[] = '- ' . ($change->changed_at ?? 'N/A') . ': ' . (($change->from_stage_title ?? 'Sin etapa') . ' -> ' . ($change->to_stage_title ?? 'Sin etapa'));
+        }
+
+        $prompt[] = 'Capacitaciones:';
+        foreach (collect($data['capacitaciones_since_reference'] ?? [])->take(5) as $cap) {
+            $prompt[] = '- ' . ($cap->capacitacion_date ?? 'N/A') . ' [' . strtoupper((string)($cap->capacitacion_mode ?? 'N/A')) . '] ' . mb_strimwidth(trim((string)($cap->capacitacion_topics ?? '')), 0, 160, '...');
+        }
+
+        $prompt[] = 'Expectativas vencidas:';
+        foreach (collect($data['expectations_overdue'] ?? [])->take(5) as $expectation) {
+            $prompt[] = '- ' . ($expectation->title ?? 'N/A') . ' (vencimiento: ' . ($expectation->due_date ?? 'N/A') . ', estado: ' . ($expectation->status ?? 'N/A') . ')';
+        }
+
+        $prompt[] = 'Comentarios del cliente:';
+        foreach (collect($data['comments_since_reference'] ?? [])->take(5) as $comment) {
+            $prompt[] = '- ' . ($comment->feedback_created ?? 'N/A') . ': "' . trim((string)($comment->comment ?? '')) . '"';
+        }
+
+        $prompt[] = 'Tareas completadas desde la última reunión (título + link):';
+        foreach (collect($data['tasks_completed_items'] ?? [])->take(12) as $task) {
+            $prompt[] = '- [' . trim((string)($task->task_title ?? 'Tarea sin título')) . '](' . ($task->task_link ?? '') . ')';
+        }
+
+        $prompt[] = 'Tareas en proceso desde la última reunión (título + link):';
+        foreach (collect($data['tasks_in_progress_items'] ?? [])->take(12) as $task) {
+            $prompt[] = '- [' . trim((string)($task->task_title ?? 'Tarea sin título')) . '](' . ($task->task_link ?? '') . ')';
+        }
+
+        $prompt[] = '';
+        $prompt[] = 'Devuelve SOLO este formato breve:';
+        $prompt[] = '1) Pantallazo general (5-7 líneas): cómo llegamos a esta reunión.';
+        $prompt[] = '2) Qué cambió desde la última reunión: 3 a 5 bullets.';
+        $prompt[] = '3) Qué cambió desde que entró a Implementación: 3 bullets (si hay dato, sino aclarar que no hay hito).';
+        $prompt[] = '4) Tareas completadas desde la última reunión: lista breve con título y link.';
+        $prompt[] = '5) Tareas en proceso: lista breve con título y link.';
+        $prompt[] = '6) Riesgos y alertas: 3 bullets máximo.';
+        $prompt[] = '7) Agenda sugerida para esta reunión: 5 puntos concretos.';
+        $prompt[] = '8) Preguntas recomendadas para el cliente: 3 preguntas.';
+        $prompt[] = 'Ajusta el criterio según la etapa actual del cliente y su descripción. Sé directo, accionable y no inventes datos faltantes.';
+        $prompt[] = 'Importante: en las secciones de tareas conserva el formato markdown de link [Título](URL) para que el equipo pueda abrirlas desde el brief.';
+
+        return implode("\n", $prompt);
+    }
+
+    private function resolvePeriodWindow($period)
+    {
+        $now = Carbon::now();
+        $period = strtolower((string) $period);
+
+        switch ($period) {
+            case 'month':
+                return [$now->copy()->subMonth(), $now, 'Último mes'];
+            case 'quarter':
+                return [$now->copy()->subMonths(3), $now, 'Último trimestre'];
+            case 'week':
+            default:
+                return [$now->copy()->subWeek(), $now, 'Última semana'];
+        }
     }
 
     /**
@@ -716,7 +1235,7 @@ class ClientAIRepository
         if ($feedbackDetails->isEmpty()) {
             return [
                 'average_score' => 'N/A',
-                'trend' => 'No hay feedback disponible'
+                'trend' => 'No feedback available'
             ];
         }
 
@@ -740,7 +1259,7 @@ class ClientAIRepository
         $averageScore = count($feedbackScores) > 0 ? round(array_sum($feedbackScores) / count($feedbackScores), 2) : 0;
 
         // Determine trend (simplified - you could make this more sophisticated)
-        $trend = 'Estable';
+        $trend = 'Stable';
         if (count($feedbackScores) >= 2) {
             $recentScores = array_slice($feedbackScores, 0, 3);
             $olderScores = array_slice($feedbackScores, -3);
@@ -749,9 +1268,9 @@ class ClientAIRepository
             $olderAvg = array_sum($olderScores) / count($olderScores);
             
             if ($recentAvg > $olderAvg + 0.5) {
-                $trend = 'Mejorando';
+                $trend = 'Improving';
             } elseif ($recentAvg < $olderAvg - 0.5) {
-                $trend = 'En declive';
+                $trend = 'Declining';
             }
         }
 

@@ -182,6 +182,15 @@ return [
         'task_title' => strtolower(__('lang.title')),
         'task_status' => strtolower(__('lang.status')),
         'task_priority' => strtolower(__('lang.priority')),
+        'task_start_date' => strtolower(__('lang.start_date')),
+        'task_short_title' => strtolower(__('lang.short_title')),
+        'task_start_time' => strtolower(__('lang.start_time')),
+        'task_end_time' => strtolower(__('lang.end_time')),
+        'task_estimated_time' => strtolower(__('lang.estimated_time')),
+        'task_estimated_time_value' => strtolower(__('lang.estimated_time')),
+        'task_estimated_time_unit' => strtolower(__('lang.unit')),
+        'task_location' => strtolower(__('lang.location')),
+        'task_color' => strtolower(__('lang.task_color')),
 
         //create or edit invoice or clone
         'invoice_date' => strtolower(__('lang.invoice_date')),

@@ -787,6 +787,31 @@
                 <!--[MODULES] - dynamic menu-->
                 {!! config('modules.menus.settings.parent24') !!}
 
+                <!--Settings & Permissions-->
+                <li class="sidenav-menu-item {{ $page['settingsmenu_permissions'] ?? '' }}">
+                    <a class="has-arrow waves-effect waves-dark" href="javascript:void(0);" aria-expanded="false"
+                        id="settings-menu-permissions">
+                        <span class="hide-menu">{{ cleanLang(__('lang.settings_permissions')) }}
+                        </span>
+                    </a>
+                    <ul aria-expanded="false" class="collapse">
+                                        <li>
+                    <a href="javascript:void(0);" data-url="/app/settings/permissions/modules" id="settings-menu-permissions-modules"
+                        class="settings-menu-link js-ajax-ux-request js-submenu-ajax js-dynamic-settings-url">{{ cleanLang(__('lang.available_modules')) }}</a>
+                </li>
+                <li>
+                    <a href="javascript:void(0);" data-url="/app/settings/permissions/roles" id="settings-menu-permissions-roles"
+                        class="settings-menu-link js-ajax-ux-request js-submenu-ajax js-dynamic-settings-url">{{ cleanLang(__('lang.role_permissions')) }}</a>
+                </li>
+                <li>
+                    <a href="javascript:void(0);" data-url="/app/settings/permissions/whatsapp" id="settings-menu-permissions-whatsapp"
+                        class="settings-menu-link js-ajax-ux-request js-submenu-ajax js-dynamic-settings-url">{{ cleanLang(__('lang.whatsapp_permissions')) }}</a>
+                </li>
+                        <!--[MODULES] - dynamic menu-->
+                        {!! config('modules.menus.settings.permissions') !!}
+                    </ul>
+                </li>
+
             </ul>
         </nav>
         <!-- End Sidebar navigation -->

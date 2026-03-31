@@ -156,12 +156,4 @@ class Task extends Model {
     public function reminders() {
         return $this->morphMany('App\Models\Reminder', 'reminderresource');
     }
-
-    public function status()
-    {
-        //  tasks.task_status  →  tasks_status.taskstatus_id
-        return $this->belongsTo(TaskStatus::class,
-                                'task_status',      // FK en tasks
-                                'taskstatus_id');   // PK en tasks_status
-    }
 }

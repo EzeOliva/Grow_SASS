@@ -1,0 +1,109 @@
+@extends('layout.wrapper')
+
+@section('content')
+<div class="container-fluid">
+	<div class="row page-titles">
+		<div class="col-md-6">
+			<h4 class="mb-0">Create Ticket Type</h4>
+			<p class="text-muted mb-0">Add a new ticket classification</p>
+		</div>
+		<div class="col-md-6 text-right">
+			<a href="{{ route('whatsapp.ticket-types.index') }}" class="btn btn-secondary">
+				<i class="fas fa-arrow-left me-2"></i>Back to List
+			</a>
+		</div>
+	</div>
+
+	<div class="card">
+		<div class="card-body">
+			<form action="{{ route('whatsapp.ticket-types.store') }}" method="POST">
+				@csrf
+				
+				<div class="row">
+					<div class="col-md-6">
+						<div class="form-group">
+							<label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+							<input type="text" class="form-control @error('name') is-invalid @enderror" 
+								id="name" name="name" value="{{ old('name') }}" 
+								placeholder="e.g., Bug, Inquiry, Feature Request" required>
+							@error('name')
+								<div class="invalid-feedback">{{ $message }}</div>
+							@enderror
+						</div>
+					</div>
+					
+					<div class="col-md-6">
+						<div class="form-group">
+							<label for="color" class="form-label">Color <span class="text-danger">*</span></label>
+							<div class="input-group">
+								<input type="color" class="form-control form-control-color @error('color') is-invalid @enderror" 
+									id="color" name="color" value="{{ old('color', '#6c757d') }}" required>
+								<input type="text" class="form-control" value="{{ old('color', '#6c757d') }}" 
+									placeholder="#6c757d" readonly>
+							</div>
+							@error('color')
+								<div class="invalid-feedback">{{ $message }}</div>
+							@enderror
+						</div>
+					</div>
+				</div>
+
+				<div class="row mt-3">
+					<div class="col-md-6">
+						<div class="form-group">
+							<label for="sort_order" class="form-label">Sort Order</label>
+							<input type="number" class="form-control @error('sort_order') is-invalid @enderror" 
+								id="sort_order" name="sort_order" value="{{ old('sort_order') }}" 
+								placeholder="Leave empty for auto-assignment" min="0">
+							@error('sort_order')
+								<div class="invalid-feedback">{{ $message }}</div>
+							@enderror
+							<small class="form-text text-muted">Lower numbers appear first in lists</small>
+						</div>
+					</div>
+					
+					<div class="col-md-6">
+						<div class="form-group">
+							<label for="description" class="form-label">Description</label>
+							<textarea class="form-control @error('description') is-invalid @enderror" 
+								id="description" name="description" rows="3" 
+								placeholder="Optional description of this ticket type">{{ old('description') }}</textarea>
+							@error('description')
+								<div class="invalid-feedback">{{ $message }}</div>
+							@enderror
+						</div>
+					</div>
+				</div>
+
+				<div class="row mt-4">
+					<div class="col-12">
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								<i class="fas fa-save me-2"></i>Create Ticket Type
+							</button>
+							<a href="{{ route('whatsapp.ticket-types.index') }}" class="btn btn-secondary ms-2">Cancel</a>
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const colorInput = document.getElementById('color');
+    const colorText = colorInput.nextElementSibling;
+    
+    colorInput.addEventListener('input', function() {
+        colorText.value = this.value;
+    });
+    
+    colorText.addEventListener('input', function() {
+        if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
+            colorInput.value = this.value;
+        }
+    });
+});
+</script>
+@endsection

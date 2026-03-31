@@ -164,7 +164,7 @@
                     data-loading-target="basicModalContent"
                     data-loading-class="loading"
                     style="background:none; border:none; box-shadow:none; padding:0;">
-                    <i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>
+                    <i class="fas fa-robot text-info"></i>
                 </button>
                 <!--/AI Analysis-->
                 <!--pin-->

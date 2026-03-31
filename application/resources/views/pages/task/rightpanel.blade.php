@@ -202,29 +202,6 @@
                 </div>
             @endif
 
-            <!--billable (visible en Settings)-->
-            <div class="x-element" id="card-task-billable-row"><i class="mdi mdi-cash-multiple"></i>
-                <span>{{ cleanLang(__('lang.billable')) }}:</span>
-                @if ($task->permission_edit_task)
-                    <span class="x-highlight x-editable js-card-settings-button-static"
-                        data-container=".card-modal"
-                        id="card-task-billable-text"
-                        tabindex="0"
-                        data-popover-content="card-task-billable-popover"   {{-- <- DEBE coincidir con el id del popover oculto --}}
-                        data-offset="0 25%"
-                        data-title="{{ cleanLang(__('lang.billable')) }}">
-                    {{ $task->task_billable == 'yes' ? cleanLang(__('lang.yes')) : cleanLang(__('lang.no')) }}
-                    </span>
-                @else
-                    <span class="x-highlight">
-                    {{ $task->task_billable == 'yes' ? cleanLang(__('lang.yes')) : cleanLang(__('lang.no')) }}
-                    </span>
-                @endif
-            </div>
-
-
-
-
             <!--reminder-->
             @if (config('visibility.modules.reminders') && $task->project_type == 'project')
                 <div class="card-reminders-container" id="card-reminders-container">
@@ -811,57 +788,3 @@
             </div>
         </div>
     @endif
-
-    @if ($task->permission_edit_task)
-    <div class="hidden" id="card-task-billable-popover">
-        <ul class="list">
-            <li class="card-tasks-update-billable-link"
-                data-button-text="card-task-billable-text"
-                data-progress-bar="hidden"
-                data-url="{{ urlResource('/tasks/'.$task->task_id.'/update-billable') }}"
-                data-type="form"
-                data-value="yes"
-                data-text="{{ cleanLang(__('lang.yes')) }}"
-                data-form-id="popover-body"
-                data-ajax-type="post">
-                {{ cleanLang(__('lang.yes')) }}
-            </li>
-            <li class="card-tasks-update-billable-link"
-                data-button-text="card-task-billable-text"
-                data-progress-bar="hidden"
-                data-url="{{ urlResource('/tasks/'.$task->task_id.'/update-billable') }}"
-                data-type="form"
-                data-value="no"
-                data-text="{{ cleanLang(__('lang.no')) }}"
-                data-form-id="popover-body"
-                data-ajax-type="post">
-                {{ cleanLang(__('lang.no')) }}
-            </li>
-        </ul>
-    </div>
-    @endif
-
-
-<script>
-(function () {
-  // evita múltiple binding si el panel se re-renderiza
-  $(document).off('click.cardBillable');
-  $(document).on('click.cardBillable', '.card-tasks-update-billable-link', function () {
-      var $el  = $(this);
-      var url  = $el.data('url');
-      var val  = $el.data('value');
-      var text = $el.data('text');
-      var btn  = $el.data('button-text');
-
-      // feedback inmediato en el texto del renglón
-      $('#' + btn).text(text);
-
-      if (typeof NX !== 'undefined' && NX.ajaxUxRequest) {
-          NX.ajaxUxRequest(url, { task_billable: val, _token: NX.csrf_token });
-      } else {
-          $.post(url, { task_billable: val, _token: '{{ csrf_token() }}' });
-      }
-  });
-})();
-</script>
-

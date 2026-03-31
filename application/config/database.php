@@ -52,12 +52,10 @@ return [
         //[MT]
         'tenant' => [
             'driver' => 'mysql',
-            'host' => env_db_host(),
-            'port' => env_db_port(),
-            'database' => 'crm_p3b3y8_1751124177',
-            'username' => env_db_user(),
-            'password' => env_db_password(),
-            'unix_socket' => '',
+            'unix_socket' => 'C:/xampp/mysql/mysql.sock',
+            'database' => '',
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',
@@ -68,12 +66,10 @@ return [
         //MULTITENANCY
         'landlord' => [
             'driver' => 'mysql',
-            'host' => env_db_host(),
-            'port' => env_db_port(),
-            'database' => env('LANDLORD_DB_DATABASE', ''),
-            'username' => env_db_user(),
-            'password' => env_db_password(),
-            'unix_socket' => '',
+            'unix_socket' => 'C:/xampp/mysql/mysql.sock',
+            'database' => env('LANDLORD_DB_DATABASE', 'growcrm_landlord'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',

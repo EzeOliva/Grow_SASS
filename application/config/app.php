@@ -243,6 +243,7 @@ return [
         'NX' => App\Nextloop\Core::class,
         'Image' => Intervention\Image\Facades\Image::class,
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
+        'Tenant' => App\Facades\Tenant::class,
     ],
 
     /*

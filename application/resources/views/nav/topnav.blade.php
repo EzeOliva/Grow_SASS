@@ -119,7 +119,7 @@
 
 
             <!--RIGHT SIDE-->
-            <ul class="navbar-nav navbar-top-right my-lg-0" id="right-topnav-navbar">
+            <ul class="navbar-nav navbar-top-right my-lg-0" id="right-topnav-navbar" style = "align-items: center">
 
                 <!--[MODULES] - dynamic menu-->
                 {!! config('modules.menus.topnav.parent1') !!}
@@ -199,6 +199,14 @@
                     </a>
                 </li>
                 @endif
+
+                <!-- WhatsApp Tickets --
+                <li class="nav-item">
+                    <a class="nav-link waves-effect waves-dark font-22 p-t-10 p-r-10" href="{{ url('/whatsapp/tickets') }}"
+                        aria-expanded="false" title="WhatsApp Tickets">
+                        <i class="fab fa-whatsapp text-success"></i>
+                    </a>
+                </li> -->
 
                 <!--[MODULES] - dynamic menu-->
                 {!! config('modules.menus.topnav.parent6') !!}

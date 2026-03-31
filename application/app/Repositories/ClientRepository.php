@@ -291,6 +291,36 @@ class ClientRepository {
             END
         ) AS health_status');
 
+        // === Custom: Last 3 months activity signals (for alerts in list) ===
+        $clients->selectRaw("(SELECT COUNT(*)
+                                      FROM client_expectations
+                                      WHERE client_id = clients.client_id
+                                      AND expectation_created >= DATE_SUB(NOW(), INTERVAL 3 MONTH))
+                                      AS expectations_last_3_months_count");
+
+        $clients->selectRaw("(SELECT COUNT(*)
+                                      FROM feedbacks
+                                      WHERE client_id = clients.client_id
+                                      AND feedback_created >= DATE_SUB(NOW(), INTERVAL 3 MONTH))
+                                      AS feedback_last_3_months_count");
+
+        $clients->selectRaw("(SELECT COUNT(*)
+                                      FROM client_minutas
+                                      WHERE client_id = clients.client_id
+                                      AND minuta_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH))
+                                      AS minutas_last_3_months_count");
+
+        // === Custom: Current pipeline stage ===
+        if (Schema::hasTable('client_stages') && Schema::hasColumn('clients', 'client_stage_id')) {
+            $clients->selectRaw("(SELECT client_stage_title
+                                      FROM client_stages
+                                      WHERE client_stage_id = clients.client_stage_id
+                                      LIMIT 1)
+                                      AS current_stage_title");
+        } else {
+            $clients->selectRaw("'' AS current_stage_title");
+        }
+
         //join: primary contact
         $clients->leftJoin('users', function ($join) {
             $join->on('users.clientid', '=', 'clients.client_id');
@@ -498,6 +528,9 @@ class ClientRepository {
                 $query->orwhere('client_custom_field_1', 'LIKE', '%' . request('search_query') . '%');
                 $query->orWhere('client_created', 'LIKE', '%' . request('search_query') . '%');
                 $query->orWhere('client_status', '=', request('search_query'));
+                if (Schema::hasTable('client_stages') && Schema::hasColumn('clients', 'client_stage_id')) {
+                    $query->orWhereRaw('(SELECT client_stage_title FROM client_stages WHERE client_stage_id = clients.client_stage_id LIMIT 1) LIKE ?', ['%' . request('search_query') . '%']);
+                }
                 $query->orWhereHas('tags', function ($query) {
                     $query->where('tag_title', 'LIKE', '%' . request('search_query') . '%');
                 });
@@ -686,6 +719,7 @@ class ClientRepository {
                 'average_feedback',
                 'expectation_fulfillment',
                 'health_status',
+                'current_stage_title',
             ];
             foreach ($list as $key) {
                 if (request('orderby') == $key) {
@@ -755,6 +789,16 @@ class ClientRepository {
         $client->client_billing_zip = request('client_billing_zip');
         $client->client_billing_country = request('client_billing_country');
         $client->client_categoryid = (request()->filled('client_categoryid')) ? request('client_categoryid') : 2; //default
+
+        if (Schema::hasColumn('clients', 'client_stage_id') && Schema::hasTable('client_stages')) {
+            $defaultStage = \App\Models\ClientStage::where('client_stage_active', 'yes')
+                ->orderBy('client_stage_position', 'asc')
+                ->orderBy('client_stage_id', 'asc')
+                ->first();
+            if ($defaultStage) {
+                $client->client_stage_id = $defaultStage->client_stage_id;
+            }
+        }
 
         //module settings
         $client->client_app_modules = request('client_app_modules');

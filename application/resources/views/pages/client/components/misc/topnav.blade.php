@@ -156,6 +156,32 @@
             data-url="{{ url('/notes') }}?source=ext&page=1&noteresource_type=client&noteresource_id={{ $client->client_id }}"
             href="#clients_ajaxtab" role="tab">{{ cleanLang(__('lang.notes')) }}</a>
     </li>
+    @if(auth()->user()->is_team)
+    <li class="nav-item">
+        <a class="nav-link  tabs-menu-item js-dynamic-url js-ajax-ux-request {{ $page['tabmenu_minutas'] ?? '' }}"
+            id="tabs-menu-minutas" data-toggle="tab" data-loading-class="loading-tabs"
+            data-loading-target="embed-content-container"
+            data-dynamic-url="{{ url('clients') }}/{{ $client->client_id }}/minutas"
+            data-url="{{ _url('/clients') }}/{{ $client->client_id }}/client-minutas"
+            href="#clients_ajaxtab" role="tab">Minutas</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link  tabs-menu-item js-dynamic-url js-ajax-ux-request {{ $page['tabmenu_capacitaciones'] ?? '' }}"
+            id="tabs-menu-capacitaciones" data-toggle="tab" data-loading-class="loading-tabs"
+            data-loading-target="embed-content-container"
+            data-dynamic-url="{{ url('clients') }}/{{ $client->client_id }}/capacitaciones"
+            data-url="{{ _url('/clients') }}/{{ $client->client_id }}/client-capacitaciones"
+            href="#clients_ajaxtab" role="tab">Capacitaciones</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link  tabs-menu-item js-dynamic-url js-ajax-ux-request {{ $page['tabmenu_etapas'] ?? '' }}"
+            id="tabs-menu-etapas" data-toggle="tab" data-loading-class="loading-tabs"
+            data-loading-target="embed-content-container"
+            data-dynamic-url="{{ url('clients') }}/{{ $client->client_id }}/etapas"
+            data-url="{{ _url('/clients') }}/{{ $client->client_id }}/client-etapas"
+            href="#clients_ajaxtab" role="tab">Etapas</a>
+    </li>
+    @endif
     <li class="nav-item">
         <a class="nav-link  tabs-menu-item js-dynamic-url js-ajax-ux-request {{ $page['tabmenu_notes'] ?? '' }}"
             id="tabs-menu-expectativas" data-toggle="tab" data-loading-class="loading-tabs"
@@ -178,7 +204,7 @@
             data-loading-target="embed-content-container"
             data-dynamic-url="{{url('clients') }}/{{ $client->client_id }}/clientai"
             data-url="{{url('clients') }}/{{ $client->client_id }}/client-clientai"
-            href="#clients_ajaxtab" role="tab"><i class="fas fa-wand-magic-sparkles text-warning mr-2"></i>{{ cleanLang(__('lang.clientai')) }}</a>
+            href="#clients_ajaxtab" role="tab"><i class="fas fa-robot mr-2"></i>{{ cleanLang(__('lang.clientai')) }}</a>
     </li>
 
     <!--[MODULES] - dynamic menu-->

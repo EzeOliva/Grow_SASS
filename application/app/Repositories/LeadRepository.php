@@ -635,44 +635,44 @@ class LeadRepository {
         $lead = \App\Models\Lead::with(['assigned', 'comments', 'attachments', 'category', 'leadstatus'])->findOrFail($leadId);
         $conversionRate = $this->calculateLeadConversionRate();
         $avgResponseTime = $this->calculateLeadAvgResponseTime($leadId);
-        $prompt = "Eres una IA analista de ventas. Analiza el siguiente lead y proporciona ideas basadas en datos.\n";
-        $prompt .= "Nombre del Lead: {$lead->getFullNameAttribute()}\n";
-        $prompt .= "Titulo: {$lead->lead_title}\n";
-        $prompt .= "Empresa: {$lead->lead_company_name}\n";
-        $prompt .= "Estado: {$lead->leadstatus->leadstatus_title}\n";
-        $prompt .= "Categoría: {$lead->category->category_name}\n";
-        $prompt .= "Valor: {$lead->lead_value}\n";
-        $prompt .= "Fuente: {$lead->lead_source}\n";
-        $prompt .= "Asignado a: " . $lead->assigned->pluck('first_name')->implode(', ') . "\n";
-        $prompt .= "Tasa de Conversión: {$conversionRate}%\n";
-        $prompt .= "Tiempo de Respuesta Promedio: {$avgResponseTime} horas\n";
-        $prompt .= "Descripción: {$lead->lead_description}\n";
-        $prompt .= "Comentarios Recientes: ";
+        $prompt = "You are a sales analyst AI. Analyze the following lead and provide data-driven insights.\n";
+        $prompt .= "Lead Name: {$lead->getFullNameAttribute()}\n";
+        $prompt .= "Title: {$lead->lead_title}\n";
+        $prompt .= "Company: {$lead->lead_company_name}\n";
+        $prompt .= "Status: {$lead->leadstatus->leadstatus_title}\n";
+        $prompt .= "Category: {$lead->category->category_name}\n";
+        $prompt .= "Value: {$lead->lead_value}\n";
+        $prompt .= "Source: {$lead->lead_source}\n";
+        $prompt .= "Assigned: " . $lead->assigned->pluck('first_name')->implode(', ') . "\n";
+        $prompt .= "Conversion Rate: {$conversionRate}%\n";
+        $prompt .= "Average Response Time: {$avgResponseTime} hours\n";
+        $prompt .= "Description: {$lead->lead_description}\n";
+        $prompt .= "Recent Comments: ";
         foreach ($lead->comments->take(3) as $comment) {
             $prompt .= "- {$comment->comment_text}\n";
         }
-        $prompt .= "\nProporciona ideas sobre la probabilidad de conversión, cuellos de botella y sugerencias accionables de manera breve y clara.";
+        $prompt .= "\nProvide insights on conversion likelihood, bottlenecks, and actionable suggestions.";
         return $prompt;
     }
 
     // Generate prompt for Scoring & Suggestions tab
     public function generateLeadScoringPrompt($leadId) {
         $lead = \App\Models\Lead::with(['assigned', 'comments', 'attachments', 'category', 'leadstatus'])->findOrFail($leadId);
-        $prompt = "Eres una IA entrenadora de ventas. Evalúa el siguiente lead y proporciona recomendaciones para ganarlo.\n";
-        $prompt .= "Nombre del Lead: {$lead->getFullNameAttribute()}\n";
-        $prompt .= "Titulo: {$lead->lead_title}\n";
-        $prompt .= "Empresa: {$lead->lead_company_name}\n";
-        $prompt .= "Estado: {$lead->leadstatus->leadstatus_title}\n";
-        $prompt .= "Categoría: {$lead->category->category_name}\n";
-        $prompt .= "Valor: {$lead->lead_value}\n";
-        $prompt .= "Fuente: {$lead->lead_source}\n";
-        $prompt .= "Asignado a: " . $lead->assigned->pluck('first_name')->implode(', ') . "\n";
-        $prompt .= "Descripción: {$lead->lead_description}\n";
-        $prompt .= "Comentarios Recientes: ";
+        $prompt = "You are a sales coach AI. Score the following lead and provide recommendations to win the lead.\n";
+        $prompt .= "Lead Name: {$lead->getFullNameAttribute()}\n";
+        $prompt .= "Title: {$lead->lead_title}\n";
+        $prompt .= "Company: {$lead->lead_company_name}\n";
+        $prompt .= "Status: {$lead->leadstatus->leadstatus_title}\n";
+        $prompt .= "Category: {$lead->category->category_name}\n";
+        $prompt .= "Value: {$lead->lead_value}\n";
+        $prompt .= "Source: {$lead->lead_source}\n";
+        $prompt .= "Assigned: " . $lead->assigned->pluck('first_name')->implode(', ') . "\n";
+        $prompt .= "Description: {$lead->lead_description}\n";
+        $prompt .= "Recent Comments: ";
         foreach ($lead->comments->take(3) as $comment) {
             $prompt .= "- {$comment->comment_text}\n";
         }
-        $prompt .= "\nEvalúa el lead (0-100), describe el perfil ideal y enumera las próximas mejores (de manera breve y clara) acciones para ganar el lead.";
+        $prompt .= "\nScore the lead (0-100), describe the ideal profile, and list next best actions to win the lead.";
         return $prompt;
     }
 

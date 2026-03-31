@@ -893,56 +893,46 @@ class UserRepository {
         $teamMembers = $this->getTeamMembers('collection');
         $now = now();
         $oneWeekAgo = $now->copy()->subWeek();
-        $prompt = "# Informe semanal de miembros del equipo\n\n";
+        $prompt = "# Team Members Weekly Report\n\n";
         $noTasksInProgress = [];
         $bottlenecks = [];
         foreach ($teamMembers as $member) {
             $completedTasks = $member->assignedTasks()
-                ->whereHas('status', fn($q) =>
-                    $q->whereRaw("LOWER(taskstatus_title) REGEXP '(complet|finaliz|terminad|done|closed)'")
-                )
+                ->where('task_status', 'completed')
                 ->where('task_updated', '>=', $oneWeekAgo)
                 ->get();
-
             $inProgressTasks = $member->assignedTasks()
-                ->whereHas('status', fn($q) =>
-                    $q->whereRaw("LOWER(taskstatus_title) REGEXP '(progreso|proceso|camino|progress)'")
-                )
+                ->where('task_status', 'in_progress')
                 ->where('task_updated', '>=', $oneWeekAgo)
                 ->get();
-
             $overdueTasks = $member->assignedTasks()
                 ->where('task_date_due', '<', $now)
-                ->whereHas('status', fn($q) =>
-                    $q->whereRaw("LOWER(taskstatus_title) NOT REGEXP '(complet|finaliz|terminad|done|closed)'")
-                )
+                ->where('task_status', '!=', 'completed')
                 ->get();
-
-
             $prompt .= "## {$member->full_name}\n";
-            $prompt .= "- **Tareas completadas (última semana):**\n";
+            $prompt .= "- **Completed Tasks (last week):**\n";
             if ($completedTasks->count()) {
                 foreach ($completedTasks as $task) {
                     $prompt .= "  - {$task->task_title} ({$task->task_updated})\n";
                 }
             } else {
-                $prompt .= "  - Ninguna\n";
+                $prompt .= "  - None\n";
             }
-            $prompt .= "- **Tareas en progreso (última semana):**\n";
+            $prompt .= "- **In Progress Tasks (last week):**\n";
             if ($inProgressTasks->count()) {
                 foreach ($inProgressTasks as $task) {
-                    $prompt .= "  - {$task->task_title} (Fecha límite: {$task->task_date_due})\n";
+                    $prompt .= "  - {$task->task_title} (Due: {$task->task_date_due})\n";
                 }
             } else {
-                $prompt .= "  - Ninguna\n";
+                $prompt .= "  - None\n";
             }
-            $prompt .= "- **Tareas vencidas:**\n";
+            $prompt .= "- **Overdue Tasks:**\n";
             if ($overdueTasks->count()) {
                 foreach ($overdueTasks as $task) {
-                    $prompt .= "  - {$task->task_title} (Fecha de vencimiento: {$task->task_date_due})\n";
+                    $prompt .= "  - {$task->task_title} (Due: {$task->task_date_due})\n";
                 }
             } else {
-                $prompt .= "  - Ninguna\n";
+                $prompt .= "  - None\n";
             }
             $prompt .= "\n";
             // General alerts
@@ -954,9 +944,9 @@ class UserRepository {
                 $bottlenecks[] = $member->full_name . " ({$bottleneckCount} tasks)";
             }
         }
-        $prompt .= "## Alertas Generales\n";
-        $prompt .= "- **No hay tareas en progreso:** " . (count($noTasksInProgress) ? implode(', ', $noTasksInProgress) : 'Ninguna') . "\n";
-        $prompt .= "- **Cuellos de botella:** " . (count($bottlenecks) ? implode(', ', $bottlenecks) : 'Ninguno') . "\n";
+        $prompt .= "## General Alerts\n";
+        $prompt .= "- **No tasks in progress:** " . (count($noTasksInProgress) ? implode(', ', $noTasksInProgress) : 'None') . "\n";
+        $prompt .= "- **Bottlenecks:** " . (count($bottlenecks) ? implode(', ', $bottlenecks) : 'None') . "\n";
         return $prompt;
     }
 

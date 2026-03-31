@@ -36,6 +36,6 @@
     <!--polling trigger-->
     <span class="hidden" id="timerTaskPollingTrigger" data-type="form" data-progress-bar='hidden'
         data-notifications="disabled" data-skip-checkboxes-reset="TRUE" data-form-id="task-users-task-timer"
-        data-ajax-type="post" data-url="{{ url('/polling/timers?ref=task') }}"></span>
+        data-ajax-type="post" data-url="{{ url('/api/polling/timers?ref=task') }}"></span>
 </div>
 @endif

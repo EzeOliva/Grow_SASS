@@ -73,6 +73,7 @@ class RouteServiceProvider extends ServiceProvider {
                     require base_path('routes/web.php');
                     require base_path('routes/custom/web.php');
                     require base_path('routes/tenant/tenant.php');
+                    require base_path('routes/whatsapp.php');
                 }
             );
         Route::middleware('account')
@@ -83,6 +84,8 @@ class RouteServiceProvider extends ServiceProvider {
                     require base_path('routes/custom/web.php');
                 }
             );
+            
+
     }
 
     /**

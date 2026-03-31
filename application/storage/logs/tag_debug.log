@@ -1,0 +1,9 @@
+2025-09-03 21:41:31 - Store method called
+Data: {"_token":"tqDw7chpd6VMYXU5q2vAKaF4GgBmNp69Oyzns9jB","name":"Jason Jin","type":"global","color":"#0a6fc7","description":"fdasdfasfd","visibility_left_menu_toggle_button":"visible","system_language":"english","system_languages":{"2":"afrikaans","3":"albanian","4":"armenian","5":"bengali","6":"chinese","7":"croatian","8":"czech","9":"danish","10":"dutch","11":"english","12":"filipino","13":"french","14":"german","15":"greek","16":"hebrew","17":"hungarian","18":"indonesian","19":"italian","20":"japanese","21":"korean","22":"polish","23":"portuguese","24":"romanian","25":"russian","26":"serbian","27":"spanish","28":"swedish","29":"thai","30":"turkish","31":"ukrainian","32":"vietnamese"},"user_has_due_reminder":"none","projects_menu_list":[1]}
+Method: POST
+URL: http://localhost./whatsapp/tags
+
+2025-09-03 21:41:31 - About to create tag with tenant_id: 1
+2025-09-03 21:41:31 - About to create tag with data: {"tenant_id":1,"name":"Jason Jin","color":"#0a6fc7","description":"fdasdfasfd","type":"global","is_active":true,"created_by":1}
+2025-09-03 21:41:31 - Tag created successfully with ID: 1
+2025-09-03 21:41:31 - About to redirect to whatsapp.tags.index

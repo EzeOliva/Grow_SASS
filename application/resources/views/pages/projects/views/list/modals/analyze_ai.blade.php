@@ -2,7 +2,7 @@
 
   <div class="modal-content">
     <div class="modal-header" id="basicModalHeader">
-      <h3 class="modal-title"><i class="fas fa-wand-magic-sparkles text-warning mr-2"></i><span>AI Project Analysis - {{ $project->project_title ?? 'Project' }}</span></h3>
+      <h3 class="modal-title"><i class="fa-solid fa-wand-magic-sparkles"></i><span>AI Project Analysis - {{ $project->project_title ?? 'Project' }}</span></h3>
       <button type="button" class="close" data-dismiss="modal"
           id="basicModalCloseIcon">
           <i class="ti-close"></i>

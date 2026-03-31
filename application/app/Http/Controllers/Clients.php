@@ -20,7 +20,10 @@ use App\Http\Responses\Clients\EditResponse;
 use App\Http\Responses\Clients\ExpectativasResponse;
 use App\Http\Responses\Clients\FeedbackResponse;
 use App\Http\Responses\Clients\ClientAIResponse;
+use App\Http\Responses\Clients\CapacitacionesResponse;
+use App\Http\Responses\Clients\EtapasResponse;
 use App\Http\Responses\Clients\IndexResponse;
+use App\Http\Responses\Clients\MinutasResponse;
 use App\Http\Responses\Clients\PinningResponse;
 use App\Http\Responses\Clients\ShowDynamicResponse;
 use App\Http\Responses\Clients\ShowResponse;
@@ -38,7 +41,13 @@ use App\Repositories\PinnedRepository;
 use App\Repositories\TagRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\FeedbackRepository;
+use App\Repositories\EventRepository;
+use App\Models\ClientCapacitacion;
+use App\Models\ClientStage;
+use App\Models\ClientStageHistory;
+use App\Models\ClientMinuta;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Validator;
 
@@ -99,6 +108,13 @@ class Clients extends Controller {
             'edit',
             'update',
             'updateDescription',
+            'storeCapacitacion',
+            'storeMinuta',
+            'updateMinuta',
+            'destroyMinuta',
+            'updateCapacitacion',
+            'destroyCapacitacion',
+            'updateStage',
             'changeAccountOwner',
             'changeAccountOwnerUpdate',
         ]);
@@ -112,7 +128,29 @@ class Clients extends Controller {
 
         $this->middleware('clientsMiddlewareShow')->only([
             'show',
+            'showDynamic',
             'details',
+            'minutas',
+            'expectativas',
+            'feedback',
+            'capacitaciones',
+            'etapas',
+            'clientai',
+            'analyzeAIFeedbackOnly',
+            'analyzeAIFeedbackModal',
+            'analyzeAIModal',
+            'analyzeAIFeedback',
+            'analyzeAIExpectations',
+            'analyzeAIProjects',
+            'analyzeAIComments',
+            'analyzeAIHealthReport',
+            'analyzeAIMeetingPrep',
+            'generateAIFeedbackAnalysis',
+            'generateAIExpectationsAnalysis',
+            'generateAIProjectsAnalysis',
+            'generateAICommentsAnalysis',
+            'generateAIHealthAnalysis',
+            'generateAIMeetingPrep',
             'updateDescription',
             'emailCompose',
             'emailSend',
@@ -258,6 +296,9 @@ class Clients extends Controller {
         case 'payments':
         case 'timesheets':
         case 'notes':
+        case 'minutas':
+        case 'capacitaciones':
+        case 'etapas':
         case 'tickets':
         case 'contacts':
         case 'projects':
@@ -331,6 +372,15 @@ class Clients extends Controller {
             break;
         case 'expectativas':
             $page['dynamic_url'] = url('clients/' . $client->client_id . '/client-expectativas');
+            break;
+        case 'minutas':
+            $page['dynamic_url'] = url('clients/' . $client->client_id . '/client-minutas');
+            break;
+        case 'capacitaciones':
+            $page['dynamic_url'] = url('clients/' . $client->client_id . '/client-capacitaciones');
+            break;
+        case 'etapas':
+            $page['dynamic_url'] = url('clients/' . $client->client_id . '/client-etapas');
             break;
         case 'feedback':
             $page['dynamic_url'] = url('clients/' . $client->client_id . '/client-feedback');
@@ -739,6 +789,585 @@ class Clients extends Controller {
     }
 
     /**
+     * Show Minutas tab
+     * @param mixed $id
+     * @return \App\Http\Responses\Clients\MinutasResponse
+     */
+    public function minutas($id) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $clients = $this->clientrepo->search($id);
+        $client = $clients->first();
+
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $tags = $this->tagrepo->getByResource('client', $id);
+        $minutas = ClientMinuta::where('client_id', $id)
+            ->orderBy('minuta_date', 'desc')
+            ->orderBy('client_minuta_id', 'desc')
+            ->get();
+
+        $payload = [
+            'page' => $this->pageSettings('client', $client),
+            'client' => $client,
+            'tags' => $tags,
+            'minutas' => $minutas,
+        ];
+
+        return new MinutasResponse($payload);
+    }
+
+    /**
+     * Show Capacitaciones tab
+     * @param mixed $id
+     * @return \App\Http\Responses\Clients\CapacitacionesResponse
+     */
+    public function capacitaciones($id) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $clients = $this->clientrepo->search($id);
+        $client = $clients->first();
+
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $tags = $this->tagrepo->getByResource('client', $id);
+        $capacitaciones = ClientCapacitacion::where('client_id', $id)
+            ->orderBy('capacitacion_date', 'desc')
+            ->orderBy('client_capacitacion_id', 'desc')
+            ->get();
+
+        $payload = [
+            'page' => $this->pageSettings('client', $client),
+            'client' => $client,
+            'tags' => $tags,
+            'capacitaciones' => $capacitaciones,
+        ];
+
+        return new CapacitacionesResponse($payload);
+    }
+
+    /**
+     * Show Etapas tab
+     * @param mixed $id
+     * @return \App\Http\Responses\Clients\EtapasResponse
+     */
+    public function etapas($id) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $clients = $this->clientrepo->search($id);
+        $client = $clients->first();
+
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        if (!Schema::hasTable('client_stages') || !Schema::hasColumn('clients', 'client_stage_id')) {
+            abort(409, 'Faltan tablas/columnas de etapas. Ejecuta el script SQL de etapas.');
+        }
+
+        $tags = $this->tagrepo->getByResource('client', $id);
+        $stages = ClientStage::where('client_stage_active', 'yes')
+            ->orderBy('client_stage_position', 'asc')
+            ->orderBy('client_stage_id', 'asc')
+            ->get();
+
+        $history = ClientStageHistory::query()
+            ->from('client_stage_histories as h')
+            ->leftJoin('client_stages as from_stage', 'from_stage.client_stage_id', '=', 'h.from_stage_id')
+            ->leftJoin('client_stages as to_stage', 'to_stage.client_stage_id', '=', 'h.to_stage_id')
+            ->leftJoin('users', 'users.id', '=', 'h.changed_by')
+            ->where('h.client_id', $id)
+            ->orderBy('h.client_stage_history_id', 'desc')
+            ->select([
+                'h.*',
+                'from_stage.client_stage_title as from_stage_title',
+                'to_stage.client_stage_title as to_stage_title',
+                'users.first_name',
+                'users.last_name',
+            ])
+            ->get();
+
+        $payload = [
+            'page' => $this->pageSettings('client', $client),
+            'client' => $client,
+            'tags' => $tags,
+            'stages' => $stages,
+            'history' => $history,
+        ];
+
+        return new EtapasResponse($payload);
+    }
+
+    /**
+     * Update current stage for a client (quick change from list or tab)
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateStage(Request $request, $id, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        if (!Schema::hasTable('client_stages') || !Schema::hasTable('client_stage_histories') || !Schema::hasColumn('clients', 'client_stage_id')) {
+            abort(409, 'Faltan tablas/columnas de etapas. Ejecuta el script SQL de etapas.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'client_stage_id' => 'required|integer|exists:client_stages,client_stage_id',
+            'change_detail' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $messages = '';
+            foreach ($errors->all() as $message) {
+                $messages .= "<li>$message</li>";
+            }
+            abort(409, $messages);
+        }
+
+        $client = \App\Models\Client::where('client_id', $id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $newStageId = (int) request('client_stage_id');
+        $oldStageId = (int) ($client->client_stage_id ?: 0);
+
+        if ($oldStageId === $newStageId) {
+            return response()->json([
+                'success' => true,
+                'message' => 'La etapa ya está asignada.',
+            ]);
+        }
+
+        $newStage = ClientStage::where('client_stage_id', $newStageId)
+            ->where('client_stage_active', 'yes')
+            ->first();
+
+        if (!$newStage) {
+            abort(409, 'La etapa seleccionada no está activa.');
+        }
+
+        $oldStage = null;
+        if ($oldStageId > 0) {
+            $oldStage = ClientStage::find($oldStageId);
+            if ($oldStage && (int) $newStage->client_stage_position < (int) $oldStage->client_stage_position) {
+                abort(409, 'No se puede retroceder a una etapa anterior en este flujo secuencial.');
+            }
+        }
+
+        $client->client_stage_id = $newStageId;
+        $client->save();
+
+        $history = new ClientStageHistory();
+        $history->client_id = $client->client_id;
+        $history->from_stage_id = $oldStageId > 0 ? $oldStageId : null;
+        $history->to_stage_id = $newStageId;
+        $history->change_detail = request('change_detail', '');
+        $history->changed_by = auth()->id() ?: 0;
+        $history->changed_at = now();
+        $history->save();
+
+        $fromTitle = $oldStage ? $oldStage->client_stage_title : 'Sin etapa';
+        $toTitle = $newStage->client_stage_title;
+        $detail = trim((string) request('change_detail', ''));
+
+        $eventContent = 'Cambio de etapa: ' . $fromTitle . ' → ' . $toTitle;
+        if ($detail !== '') {
+            $eventContent .= ' | Detalle: ' . $detail;
+        }
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $history->client_stage_history_id,
+            'event_item_lang' => 'Se actualizó la etapa del cliente',
+            'event_item_content' => $eventContent,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+            'item' => [
+                'client_id' => $client->client_id,
+                'client_stage_id' => $newStage->client_stage_id,
+                'client_stage_title' => $newStage->client_stage_title,
+                'history_id' => $history->client_stage_history_id,
+            ],
+        ]);
+    }
+
+    /**
+     * Save Minuta
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeMinuta(Request $request, $id, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'minuta_date' => 'required|date',
+            'minuta_detail' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $messages = '';
+            foreach ($errors->all() as $message) {
+                $messages .= "<li>$message</li>";
+            }
+            abort(409, $messages);
+        }
+
+        $client = $this->clientrepo->search($id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $minuta = new ClientMinuta();
+        $minuta->client_id = $id;
+        $minuta->minuta_date = request('minuta_date');
+        $minuta->minuta_detail = request('minuta_detail');
+        $minuta->minuta_creatorid = auth()->id() ?: 0;
+        $minuta->save();
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $minuta->client_minuta_id,
+            'event_item_lang' => 'Se registró una minuta',
+            'event_item_content' => 'Minuta del ' . $minuta->minuta_date,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+            'item' => [
+                'client_minuta_id' => $minuta->client_minuta_id,
+                'minuta_date' => $minuta->minuta_date,
+                'minuta_detail' => $minuta->minuta_detail,
+            ],
+        ]);
+    }
+
+    /**
+     * Update Minuta
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @param int $minutaId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateMinuta(Request $request, $id, $minutaId, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'minuta_date' => 'required|date',
+            'minuta_detail' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $messages = '';
+            foreach ($errors->all() as $message) {
+                $messages .= "<li>$message</li>";
+            }
+            abort(409, $messages);
+        }
+
+        $client = $this->clientrepo->search($id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $minuta = ClientMinuta::where('client_minuta_id', $minutaId)
+            ->where('client_id', $id)
+            ->first();
+
+        if (!$minuta) {
+            abort(404);
+        }
+
+        $minuta->minuta_date = request('minuta_date');
+        $minuta->minuta_detail = request('minuta_detail');
+        $minuta->save();
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $minuta->client_minuta_id,
+            'event_item_lang' => 'Se actualizó una minuta',
+            'event_item_content' => 'Minuta del ' . $minuta->minuta_date,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+            'item' => [
+                'client_minuta_id' => $minuta->client_minuta_id,
+                'minuta_date' => $minuta->minuta_date,
+                'minuta_detail' => $minuta->minuta_detail,
+            ],
+        ]);
+    }
+
+    /**
+     * Delete Minuta
+     * @param int $id
+     * @param int $minutaId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroyMinuta($id, $minutaId, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $client = $this->clientrepo->search($id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $minuta = ClientMinuta::where('client_minuta_id', $minutaId)
+            ->where('client_id', $id)
+            ->first();
+
+        if (!$minuta) {
+            abort(404);
+        }
+
+        $deletedDate = $minuta->minuta_date;
+        $minuta->delete();
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $minutaId,
+            'event_item_lang' => 'Se eliminó una minuta',
+            'event_item_content' => 'Minuta del ' . $deletedDate,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+        ]);
+    }
+
+    /**
+     * Save Capacitacion
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeCapacitacion(Request $request, $id, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'capacitacion_date' => 'required|date',
+            'capacitacion_mode' => 'required|in:meet,onsite',
+            'capacitacion_participants' => 'required|string',
+            'capacitacion_topics' => 'required|string',
+            'capacitacion_observations' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $messages = '';
+            foreach ($errors->all() as $message) {
+                $messages .= "<li>$message</li>";
+            }
+            abort(409, $messages);
+        }
+
+        $client = $this->clientrepo->search($id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $capacitacion = new ClientCapacitacion();
+        $capacitacion->client_id = $id;
+        $capacitacion->capacitacion_date = request('capacitacion_date');
+        $capacitacion->capacitacion_mode = request('capacitacion_mode');
+        $capacitacion->capacitacion_participants = request('capacitacion_participants');
+        $capacitacion->capacitacion_topics = request('capacitacion_topics');
+        $capacitacion->capacitacion_observations = request('capacitacion_observations');
+        $capacitacion->capacitacion_creatorid = auth()->id() ?: 0;
+        $capacitacion->save();
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $capacitacion->client_capacitacion_id,
+            'event_item_lang' => 'Se registró una capacitación',
+            'event_item_content' => 'Capacitación ' . strtoupper($capacitacion->capacitacion_mode) . ' del ' . $capacitacion->capacitacion_date,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+            'item' => [
+                'client_capacitacion_id' => $capacitacion->client_capacitacion_id,
+                'capacitacion_date' => $capacitacion->capacitacion_date,
+                'capacitacion_mode' => $capacitacion->capacitacion_mode,
+                'capacitacion_participants' => $capacitacion->capacitacion_participants,
+                'capacitacion_topics' => $capacitacion->capacitacion_topics,
+                'capacitacion_observations' => $capacitacion->capacitacion_observations,
+            ],
+        ]);
+    }
+
+    /**
+     * Update Capacitacion
+     * @param \Illuminate\Http\Request $request
+     * @param int $id
+     * @param int $capacitacionId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateCapacitacion(Request $request, $id, $capacitacionId, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'capacitacion_date' => 'required|date',
+            'capacitacion_mode' => 'required|in:meet,onsite',
+            'capacitacion_participants' => 'required|string',
+            'capacitacion_topics' => 'required|string',
+            'capacitacion_observations' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $messages = '';
+            foreach ($errors->all() as $message) {
+                $messages .= "<li>$message</li>";
+            }
+            abort(409, $messages);
+        }
+
+        $client = $this->clientrepo->search($id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $capacitacion = ClientCapacitacion::where('client_capacitacion_id', $capacitacionId)
+            ->where('client_id', $id)
+            ->first();
+
+        if (!$capacitacion) {
+            abort(404);
+        }
+
+        $capacitacion->capacitacion_date = request('capacitacion_date');
+        $capacitacion->capacitacion_mode = request('capacitacion_mode');
+        $capacitacion->capacitacion_participants = request('capacitacion_participants');
+        $capacitacion->capacitacion_topics = request('capacitacion_topics');
+        $capacitacion->capacitacion_observations = request('capacitacion_observations');
+        $capacitacion->save();
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $capacitacion->client_capacitacion_id,
+            'event_item_lang' => 'Se actualizó una capacitación',
+            'event_item_content' => 'Capacitación ' . strtoupper($capacitacion->capacitacion_mode) . ' del ' . $capacitacion->capacitacion_date,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+            'item' => [
+                'client_capacitacion_id' => $capacitacion->client_capacitacion_id,
+                'capacitacion_date' => $capacitacion->capacitacion_date,
+                'capacitacion_mode' => $capacitacion->capacitacion_mode,
+                'capacitacion_participants' => $capacitacion->capacitacion_participants,
+                'capacitacion_topics' => $capacitacion->capacitacion_topics,
+                'capacitacion_observations' => $capacitacion->capacitacion_observations,
+            ],
+        ]);
+    }
+
+    /**
+     * Delete Capacitacion
+     * @param int $id
+     * @param int $capacitacionId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroyCapacitacion($id, $capacitacionId, EventRepository $eventrepo) {
+        if (!auth()->user()->is_team) {
+            abort(403);
+        }
+
+        $client = $this->clientrepo->search($id)->first();
+        if (!$client) {
+            abort(409, __('lang.client_not_found'));
+        }
+
+        $capacitacion = ClientCapacitacion::where('client_capacitacion_id', $capacitacionId)
+            ->where('client_id', $id)
+            ->first();
+
+        if (!$capacitacion) {
+            abort(404);
+        }
+
+        $deletedDate = $capacitacion->capacitacion_date;
+        $deletedMode = strtoupper($capacitacion->capacitacion_mode);
+        $capacitacion->delete();
+
+        $this->recordClientEventTimeline($eventrepo, $client, [
+            'event_item' => 'client',
+            'event_item_id' => $capacitacionId,
+            'event_item_lang' => 'Se eliminó una capacitación',
+            'event_item_content' => 'Capacitación ' . $deletedMode . ' del ' . $deletedDate,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('lang.request_has_been_completed'),
+        ]);
+    }
+
+    /**
+     * Register event in client timeline
+     * @param \App\Repositories\EventRepository $eventrepo
+     * @param mixed $client
+     * @param array $payload
+     * @return void
+     */
+    private function recordClientEventTimeline(EventRepository $eventrepo, $client, array $payload = []) {
+        $eventData = [
+            'event_creatorid' => auth()->id() ?: 0,
+            'event_clientid' => $client->client_id,
+            'event_item' => $payload['event_item'] ?? 'client',
+            'event_item_id' => $payload['event_item_id'] ?? 0,
+            'event_item_content' => $payload['event_item_content'] ?? '',
+            'event_item_lang' => $payload['event_item_lang'] ?? 'Se actualizó el cliente',
+            'event_parent_type' => 'client',
+            'event_parent_id' => $client->client_id,
+            'event_parent_title' => $client->client_company_name,
+            'event_show_item' => 'no',
+            'event_show_in_timeline' => 'yes',
+            'eventresource_type' => 'client',
+            'eventresource_id' => $client->client_id,
+            'event_notification_category' => '',
+        ];
+
+        $eventrepo->create($eventData);
+    }
+
+    /**
      * update client description and also the tags
      * @return \Illuminate\Http\Response
      */
@@ -1067,6 +1696,32 @@ class Clients extends Controller {
             'commentsData' => $commentsData,
         ]);
     }
+    public function analyzeAIHealthReport(Request $request, $clientId)
+    {
+        $client = $this->clientrepo->search($clientId)->first();
+        $period = $request->get('period', 'week');
+        $healthData = $this->clientAIrepo->getClientHealthReportData($clientId, $period);
+
+        return new \App\Http\Responses\Clients\AnalyzeAIHealthReportResponse([
+            'client' => $client,
+            'healthData' => $healthData,
+        ]);
+    }
+
+    public function analyzeAIMeetingPrep(Request $request, $clientId)
+    {
+        $client = $this->clientrepo->search($clientId)->first();
+        $fallbackDays = (int) $request->get('fallback_days', 60);
+        if ($fallbackDays <= 0) {
+            $fallbackDays = 60;
+        }
+        $meetingData = $this->clientAIrepo->getMeetingPreparationData($clientId, $fallbackDays);
+
+        return new \App\Http\Responses\Clients\AnalyzeAIMeetingPrepResponse([
+            'client' => $client,
+            'meetingData' => $meetingData,
+        ]);
+    }
     public function analyzeAIFeedbackOnly($clientId)
     {
         $client = $this->clientrepo->search($clientId)->first();
@@ -1237,6 +1892,92 @@ class Clients extends Controller {
                 'prompt' => $prompt
             ]);
 
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI analysis failed: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Generate AI analysis for customer health report
+     */
+    public function generateAIHealthAnalysis(Request $request, $clientId)
+    {
+        try {
+            $client = $this->clientrepo->search($clientId)->first();
+            if (!$client) {
+                return response()->json(['success' => false, 'message' => 'Client not found']);
+            }
+
+            $period = $request->get('period', 'week');
+            $prompt = $this->clientAIrepo->generateClientHealthAnalysisPrompt($clientId, $period);
+
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => 'Eres una inteligencia artificial experta en Customer Success. Entregas informes de salud del cliente con foco en riesgo, retención y plan de acción.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ];
+
+            $aiResponse = $this->callOpenAI($messages);
+
+            return response()->json([
+                'success' => true,
+                'analysis' => $aiResponse,
+                'prompt' => $prompt,
+                'period' => $period,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI analysis failed: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Generate AI meeting preparation brief
+     */
+    public function generateAIMeetingPrep(Request $request, $clientId)
+    {
+        try {
+            $client = $this->clientrepo->search($clientId)->first();
+            if (!$client) {
+                return response()->json(['success' => false, 'message' => 'Client not found']);
+            }
+
+            $fallbackDays = (int) $request->get('fallback_days', 60);
+            if ($fallbackDays <= 0) {
+                $fallbackDays = 60;
+            }
+
+            $prompt = $this->clientAIrepo->generateMeetingPreparationPrompt($clientId, $fallbackDays);
+
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => 'Eres una inteligencia artificial experta en Customer Success. Preparas briefs breves, accionables y orientados a reuniones con clientes.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ];
+
+            $aiResponse = $this->callOpenAI($messages);
+
+            return response()->json([
+                'success' => true,
+                'analysis' => $aiResponse,
+                'prompt' => $prompt,
+                'fallback_days' => $fallbackDays,
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
