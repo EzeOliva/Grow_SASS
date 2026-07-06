@@ -30,22 +30,7 @@
             </div>
 
             <div class="card customer-success-block mb-3">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fas fa-comment-dots text-info mr-2"></i>
-                        <span>Últimos comentarios</span>
-                    </div>
-                    <div class="pl-4">
-                        @forelse ($stats['recent_comments'] as $comment)
-                            <div>“{{ $comment }}”</div>
-                        @empty
-                            <div class="text-muted">No hay comentarios recientes.</div>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
 
-            <div class="card customer-success-block mb-3">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div>
                         <i

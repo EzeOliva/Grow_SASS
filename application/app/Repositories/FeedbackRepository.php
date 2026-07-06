@@ -64,13 +64,16 @@ class FeedbackRepository
         $query = DB::table('feedbacks as f')
             ->join('feedback_details as d', 'f.feedback_id', '=', 'd.feedback_id')
             ->join('feedback_queries as q', 'd.feedback_query_id', '=', 'q.feedback_query_id')
+            ->leftJoin('clients as c', 'f.client_id', '=', 'c.client_id')
             ->select(
                 'f.feedback_id',
+                'f.client_id',
+                'c.client_company_name',
                 'f.feedback_date',
                 'f.comment',
                 DB::raw('ROUND(SUM(q.weight * d.value) * 10 / SUM(q.weight * q.range), 2) as total_marks')
             )
-            ->groupBy('f.feedback_id', 'f.feedback_date', 'f.comment')
+            ->groupBy('f.feedback_id', 'f.client_id', 'c.client_company_name', 'f.feedback_date', 'f.comment')
             ->orderBy('f.feedback_date', 'desc');
 
         if ($clientId !== 0) {

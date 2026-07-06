@@ -329,7 +329,7 @@ class Home extends Controller {
         $payload['health_overview'] = $health['overview'];
         $payload['stage_health_snapshot'] = $health['stage_snapshot'];
         $payload['stats'] = $this->clientrepo->getCustomerSuccessStats();
-        $payload['feedbacks'] = $this->feedbackrepo->getFeedbackSummariesForClient(0);
+        $payload['feedbacks'] = $this->feedbackrepo->getFeedbackSummariesForClient(0, null, 20);
 
         //return payload
         return $payload;

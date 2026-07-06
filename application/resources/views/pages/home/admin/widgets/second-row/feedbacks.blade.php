@@ -18,6 +18,9 @@
                                 </div>
                                 <div style="flex: 1; min-width: 0;">
                                     <div class="text-muted small">
+                                        @if(!empty($fb->client_company_name))
+                                            <strong>{{ $fb->client_company_name }}</strong> &middot;
+                                        @endif
                                         {{ $fb->feedback_date_human ?? \Carbon\Carbon::parse($fb->feedback_date)->diffForHumans() }}
                                     </div>
                                     <div class="font-weight-bold text-break">"{{ $fb->comment }}"</div>
