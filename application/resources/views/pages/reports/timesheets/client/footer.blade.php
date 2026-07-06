@@ -1,6 +1,6 @@
 <!--totals-->
 <tr class="report-results-table-totals">
-    <td colspan="1">@lang('lang.page_totals')</td>
+    <td colspan="3">@lang('lang.page_totals')</td>
 
 
     <!--sum_not_invoiced-->
@@ -22,7 +22,7 @@
 
 <!--pagination-->
 <tr>
-    <td class="pagination-container" data-tableexport-display="none" colspan="11">
+    <td class="pagination-container" data-tableexport-display="none" colspan="6">
         <div class="pagination">
             {{ $timesheets->links('pages.reports.components.misc.pagination') }}
         </div>

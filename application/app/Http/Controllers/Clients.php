@@ -151,6 +151,7 @@ class Clients extends Controller {
             'generateAICommentsAnalysis',
             'generateAIHealthAnalysis',
             'generateAIMeetingPrep',
+            'publishAIHealthSummary',
             'updateDescription',
             'emailCompose',
             'emailSend',
@@ -1938,6 +1939,84 @@ class Clients extends Controller {
                 'success' => false,
                 'message' => 'AI analysis failed: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    /**
+     * Publish generated AI health summary into client timeline.
+     */
+    public function publishAIHealthSummary(Request $request, $clientId, EventRepository $eventrepo)
+    {
+        try {
+            if (!auth()->user() || !auth()->user()->is_team) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permisos para publicar resúmenes IA en la línea de tiempo.',
+                ], 403);
+            }
+
+            $client = $this->clientrepo->search($clientId)->first();
+            if (!$client) {
+                return response()->json(['success' => false, 'message' => 'Client not found']);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'period' => 'required|in:week,month,quarter',
+                'analysis' => 'required|string|min:20|max:25000',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()->first(),
+                ], 422);
+            }
+
+            $period = (string) $request->input('period', 'week');
+            $periodLabels = [
+                'week' => 'Última semana',
+                'month' => 'Último mes',
+                'quarter' => 'Último trimestre',
+            ];
+            $periodLabel = $periodLabels[$period] ?? 'Período';
+
+            $analysis = trim((string) $request->input('analysis', ''));
+            $analysis = preg_replace('/\r\n|\r/', "\n", $analysis);
+
+            // Keep timeline cards readable and avoid oversized payloads.
+            if (mb_strlen($analysis) > 12000) {
+                $analysis = mb_substr($analysis, 0, 12000) . "\n\n[Resumen recortado por longitud]";
+            }
+
+            $eventrepo->create([
+                'event_creatorid' => auth()->id() ?: 0,
+                'event_clientid' => $client->client_id,
+                'event_item' => 'ai_health_summary',
+                'event_item_id' => 0,
+                'event_item_lang' => 'Se agregó un resumen IA de salud del cliente',
+                'event_item_content' => 'Resumen IA - ' . $periodLabel,
+                'event_item_content2' => $analysis,
+                'event_item_content3' => $period,
+                'event_parent_type' => 'client',
+                'event_parent_id' => $client->client_id,
+                'event_parent_title' => $client->client_company_name,
+                'event_show_item' => 'yes',
+                'event_show_in_timeline' => 'yes',
+                'eventresource_type' => 'client',
+                'eventresource_id' => $client->client_id,
+                'event_notification_category' => '',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Resumen IA agregado a la línea de tiempo.',
+                'period' => $period,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo publicar el resumen en línea de tiempo: ' . $e->getMessage(),
+            ], 500);
         }
     }
 

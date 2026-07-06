@@ -17,7 +17,9 @@ use App\Repositories\StatsRepository;
 use App\Repositories\TaskRepository;
 use App\Repositories\ClientRepository;
 use App\Repositories\FeedbackRepository;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class Home extends Controller {
 
@@ -228,20 +230,6 @@ class Home extends Controller {
         //payload
         $payload = [];
 
-        //[invoices]
-        $payload['invoices'] = [
-            'due' => $this->statsrepo->sumCountInvoices([
-                'type' => 'sum',
-                'status' => 'due',
-                'client_id' => auth()->user()->clientid,
-            ]),
-            'overdue' => $this->statsrepo->sumCountInvoices([
-                'type' => 'sum',
-                'status' => 'overdue',
-                'client_id' => auth()->user()->clientid,
-            ]),
-        ];
-
         //[projects][all]
         $payload['projects'] = [
             'pending' => $this->statsrepo->countProjects([
@@ -266,6 +254,20 @@ class Home extends Controller {
         ]);
         $payload['my_projects'] = $this->projectrepo->search('', ['limit' => 30]);
 
+        $payload['stats'] = $this->clientrepo->getCustomerSuccessStats((int) auth()->user()->clientid);
+        $payload['client_stage_title'] = 'Sin etapa';
+
+        if (Schema::hasTable('client_stages') && Schema::hasColumn('clients', 'client_stage_id')) {
+            $stageTitle = DB::table('clients')
+                ->leftJoin('client_stages', 'client_stages.client_stage_id', '=', 'clients.client_stage_id')
+                ->where('clients.client_id', (int) auth()->user()->clientid)
+                ->value('client_stages.client_stage_title');
+
+            if (!empty($stageTitle)) {
+                $payload['client_stage_title'] = $stageTitle;
+            }
+        }
+
         //return payload
         return $payload;
 
@@ -279,41 +281,6 @@ class Home extends Controller {
 
         //payload
         $payload = [];
-
-        //[payments]
-        $payload['payments'] = [
-            'today' => $this->statsrepo->sumCountPayments([
-                'type' => 'sum',
-                'date' => \Carbon\Carbon::now()->format('Y-m-d'),
-            ]),
-            'this_month' => $this->statsrepo->sumCountPayments([
-                'type' => 'sum',
-                'start_date' => \Carbon\Carbon::now()->startOfMonth()->format('Y-m-d'),
-                'end_date' => \Carbon\Carbon::now()->lastOfMonth()->format('Y-m-d'),
-            ]),
-        ];
-
-        //[invoices]
-        $payload['invoices'] = [
-            'due' => $this->statsrepo->sumCountInvoices([
-                'type' => 'sum',
-                'status' => 'due',
-            ]),
-            'overdue' => $this->statsrepo->sumCountInvoices([
-                'type' => 'sum',
-                'status' => 'overdue',
-            ]),
-        ];
-
-        //[income][yearly]
-        $payload['income'] = $this->statsrepo->sumYearlyIncome([
-            'period' => 'this_year',
-        ]);
-
-        //[expense][yearly]
-        $payload['expenses'] = $this->statsrepo->sumYearlyExpenses([
-            'period' => 'this_year',
-        ]);
 
         //[projects][all]
         $payload['all_projects'] = [
@@ -358,31 +325,157 @@ class Home extends Controller {
             'filter' => 'timeline_visible',
         ]);
 
-        //[leads] - alltime
-        $data = $this->widgetLeads('alltime');
-        $payload['leads_stats'] = json_encode($data['stats']);
-        $payload['leads_key_colors'] = json_encode($data['leads_key_colors']);
-        $payload['leads_chart_center_title'] = $data['leads_chart_center_title'];
-
-        //[tickets] - this year
-        $ticket_data = $this->widgetTickets('thisyear');
-        $payload['tickets_stats'] = json_encode($ticket_data['stats']);
-        $payload['tickets_key_colors'] = json_encode($ticket_data['tickets_key_colors']);
-        $payload['tickets_chart_center_title'] = $ticket_data['tickets_chart_center_title'] . ' - ' . $ticket_data['count_all_tickets'];
-        $payload['ticket_statuses'] = $ticket_data['ticket_statuses'];
-
-        //filter payments-today
-        $payload['filter_payment_today'] = \Carbon\Carbon::now()->format('Y-m-d');
-
-        //filter payments - this month
-        $payload['filter_payment_month_start'] = \Carbon\Carbon::now()->startOfMonth()->format('Y-m-d');
-        $payload['filter_payment_month_end'] = \Carbon\Carbon::now()->lastOfMonth()->format('Y-m-d');
+        $health = $this->buildHealthOverviewPayload();
+        $payload['health_overview'] = $health['overview'];
+        $payload['stage_health_snapshot'] = $health['stage_snapshot'];
         $payload['stats'] = $this->clientrepo->getCustomerSuccessStats();
         $payload['feedbacks'] = $this->feedbackrepo->getFeedbackSummariesForClient(0);
 
         //return payload
         return $payload;
 
+    }
+
+    /**
+     * Build health-focused home dashboard aggregates for admin users.
+     *
+     * @return array
+     */
+    private function buildHealthOverviewPayload() {
+
+        $healthStatusCaseSql = $this->clientHealthStatusCaseSql();
+
+        $healthRows = DB::table('clients')
+            ->selectRaw("{$healthStatusCaseSql} as health_status, COUNT(*) as total")
+            ->where('clients.client_id', '>', 0)
+            ->groupBy('health_status')
+            ->pluck('total', 'health_status');
+
+        $totalClients = (int) DB::table('clients')
+            ->where('clients.client_id', '>', 0)
+            ->count();
+
+        $withoutRecentFeedback = (int) DB::table('clients')
+            ->leftJoin('feedbacks', function ($join) {
+                $join->on('feedbacks.client_id', '=', 'clients.client_id')
+                    ->where('feedbacks.feedback_created', '>=', now()->subMonths(3)->format('Y-m-d H:i:s'));
+            })
+            ->where('clients.client_id', '>', 0)
+            ->whereNull('feedbacks.feedback_id')
+            ->count('clients.client_id');
+
+        $overview = [
+            'green' => (int) ($healthRows['green'] ?? 0),
+            'yellow' => (int) ($healthRows['yellow'] ?? 0),
+            'red' => (int) ($healthRows['red'] ?? 0),
+            'total_clients' => $totalClients,
+            'without_recent_feedback' => $withoutRecentFeedback,
+        ];
+
+        $overview['at_risk'] = (int) ($overview['yellow'] + $overview['red']);
+        $overview['at_risk_percent'] = $overview['total_clients'] > 0
+            ? (int) round(($overview['at_risk'] * 100) / $overview['total_clients'])
+            : 0;
+
+        if (Schema::hasTable('client_stages') && Schema::hasColumn('clients', 'client_stage_id')) {
+            $stageRows = DB::table('clients')
+                ->leftJoin('client_stages', 'client_stages.client_stage_id', '=', 'clients.client_stage_id')
+                ->where('clients.client_id', '>', 0)
+                ->selectRaw('COALESCE(client_stages.client_stage_title, "Sin etapa") as stage_title')
+                ->selectRaw('COALESCE(client_stages.client_stage_position, 999999) as stage_position')
+                ->selectRaw('COUNT(*) as total_clients')
+                ->selectRaw("SUM(CASE WHEN {$healthStatusCaseSql} = 'red' THEN 1 ELSE 0 END) as red_clients")
+                ->selectRaw("SUM(CASE WHEN {$healthStatusCaseSql} = 'yellow' THEN 1 ELSE 0 END) as yellow_clients")
+                ->groupBy('stage_title', 'stage_position')
+                ->orderBy('stage_position', 'asc')
+                ->orderBy('stage_title', 'asc')
+                ->get();
+        } else {
+            $stageRows = DB::table('clients')
+                ->where('clients.client_id', '>', 0)
+                ->selectRaw('"Sin etapa" as stage_title')
+                ->selectRaw('999999 as stage_position')
+                ->selectRaw('COUNT(*) as total_clients')
+                ->selectRaw("SUM(CASE WHEN {$healthStatusCaseSql} = 'red' THEN 1 ELSE 0 END) as red_clients")
+                ->selectRaw("SUM(CASE WHEN {$healthStatusCaseSql} = 'yellow' THEN 1 ELSE 0 END) as yellow_clients")
+                ->get();
+        }
+
+        $stageSnapshot = $stageRows->map(function ($row) {
+            $total = (int) ($row->total_clients ?? 0);
+            $red = (int) ($row->red_clients ?? 0);
+            $yellow = (int) ($row->yellow_clients ?? 0);
+            $atRisk = $red + $yellow;
+
+            return [
+                'stage_title' => (string) ($row->stage_title ?? 'Sin etapa'),
+                'total_clients' => $total,
+                'red_clients' => $red,
+                'yellow_clients' => $yellow,
+                'at_risk_clients' => $atRisk,
+                'at_risk_percent' => $total > 0 ? (int) round(($atRisk * 100) / $total) : 0,
+            ];
+        })->values();
+
+        return [
+            'overview' => $overview,
+            'stage_snapshot' => $stageSnapshot,
+        ];
+    }
+
+    /**
+     * Reusable SQL snippet that computes the health status for a client.
+     *
+     * @return string
+     */
+    private function clientHealthStatusCaseSql() {
+        return '(
+            CASE
+                WHEN
+                    (
+                        SELECT
+                            CASE WHEN SUM(weight) > 0
+                                THEN ROUND(SUM(CASE WHEN status = "fulfilled" THEN weight ELSE 0 END) * 100 / SUM(weight), 0)
+                                ELSE 0
+                            END
+                        FROM client_expectations
+                        WHERE client_id = clients.client_id
+                    ) >= 70
+                    AND
+                    (
+                        SELECT ROUND(SUM(q.weight * d.value) * 10 / NULLIF(SUM(q.weight * q.range), 0), 2)
+                        FROM feedback_details d
+                        JOIN feedbacks f ON f.feedback_id = d.feedback_id
+                        JOIN feedback_queries q ON q.feedback_query_id = d.feedback_query_id
+                        WHERE f.client_id = clients.client_id
+                    ) >= 7
+                THEN "green"
+                WHEN
+                    (
+                        (
+                            SELECT
+                                CASE WHEN SUM(weight) > 0
+                                    THEN ROUND(SUM(CASE WHEN status = "fulfilled" THEN weight ELSE 0 END) * 100 / SUM(weight), 0)
+                                    ELSE 0
+                                END
+                            FROM client_expectations
+                            WHERE client_id = clients.client_id
+                        ) BETWEEN 40 AND 69
+                    )
+                    OR
+                    (
+                        (
+                            SELECT ROUND(SUM(q.weight * d.value) * 10 / NULLIF(SUM(q.weight * q.range), 0), 2)
+                            FROM feedback_details d
+                            JOIN feedbacks f ON f.feedback_id = d.feedback_id
+                            JOIN feedback_queries q ON q.feedback_query_id = d.feedback_query_id
+                            WHERE f.client_id = clients.client_id
+                        ) BETWEEN 5 AND 6
+                    )
+                THEN "yellow"
+                ELSE "red"
+            END
+        )';
     }
 
     /**

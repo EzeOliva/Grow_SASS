@@ -31,6 +31,9 @@ class ClientResponse implements Responsable {
             $$key = $value;
         }
 
+        //default
+        $clients = $clients ?? collect();
+
         if (request('action') == 'load' || request('action') == 'sort') {
 
             if (request('action') == 'load') {
@@ -55,7 +58,7 @@ class ClientResponse implements Responsable {
             $jsondata['skip_dom_reset'] = true;
 
         } else {
-            $html = view('pages/reports/timesheets/client/wrapper', compact('timesheets', 'totals'))->render();
+            $html = view('pages/reports/timesheets/client/wrapper', compact('timesheets', 'totals', 'clients'))->render();
             $jsondata['dom_html'][] = [
                 'selector' => '#embed-content-container',
                 'action' => 'replace',

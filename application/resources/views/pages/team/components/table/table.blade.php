@@ -1,5 +1,9 @@
 <div class="card" id="team-table-wrapper" id="team-table-wrapper">
     <div class="card-body">
+        @if(!empty($adminTeamTaskStatsVisible) && $adminTeamTaskStatsVisible)
+        @include('pages.team.components.table.admin-completed-tasks-panel')
+        @endif
+
         <div class="table-responsive list-table-wrapper">
             @if (!$users->isEmpty())
             <table id="team-list-table" class="table m-t-0 m-b-0 table-hover no-wrap contact-list" data-page-size="10">

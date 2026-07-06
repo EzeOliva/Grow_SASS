@@ -89,6 +89,12 @@ class Timesheets extends Controller {
         //search
         $timesheets = $this->reportrepo->getClient();
 
+        //clients list for optional report filtering
+        $clients = \App\Models\Client::select('client_id', 'client_company_name')
+            ->where('client_id', '>', 0)
+            ->orderBy('client_company_name', 'asc')
+            ->get();
+
         //get totals
         $totals = [
             'sum_hours' => $this->reportrepo->getClient(null, ['totals' => 'sum_hours']),
@@ -101,6 +107,7 @@ class Timesheets extends Controller {
             'timesheets' => $timesheets,
             'page' => $this->pageSettings('client'),
             'totals' => $totals,
+            'clients' => $clients,
         ];
 
         //process reponse

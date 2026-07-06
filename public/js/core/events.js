@@ -188,6 +188,13 @@ $(document).ready(function () {
         NX.projectAssignedTasksToggle(e, $(this));
     });
 
+    /** --------------------------------------------------------------------------------------------------
+     *  [record time modal] - toggle entry mode
+     * -------------------------------------------------------------------------------------------------*/
+    $(document).on('change', '#timer_entry_mode', function () {
+        NX.recordTaskTimeModeToggle($(this).val());
+    });
+
 
     /** --------------------------------------------------------------------------------------------------
      *  [toggle ticket editor or view mode]
@@ -2003,6 +2010,9 @@ $(document).ready(function () {
 
         //reset the projects dropdown
         $("#my_assigned_projects").val(null).trigger('change');
+
+        //reset optional client-mode project dropdown
+        $("#timesheet_projectid").empty().prop('disabled', true).val(null).trigger('change');
 
         //clear and disable the tasks dropdown
         $("#my_assigned_tasks").empty().prop('disabled', true);

@@ -1542,6 +1542,44 @@ NX.recordTaskTimeToggle = function (action = 'disable') {
 }
 
 /** ----------------------------------------------------------
+ *   toggle task/client mode for recording time
+ * -----------------------------------------------------------*/
+NX.recordTaskTimeModeToggle = function (mode = 'task') {
+
+    //client mode
+    if (mode == 'client') {
+        $("#timesheet-entry-mode-task").addClass('hidden');
+        $("#timesheet-entry-mode-client").removeClass('hidden');
+
+        //client mode fields
+        $("#timesheet_clientid").prop("disabled", false);
+        $("#timesheet_projectid").prop("disabled", false);
+        $("#timer_notes").prop("disabled", false);
+
+        //task mode fields
+        $("#my_assigned_projects").prop("disabled", true).val(null).trigger('change');
+        $("#my_assigned_tasks").prop("disabled", true).empty().trigger('change');
+        $("#my_assigned_tasks_no_results").hide();
+
+        //enable date/time and submit
+        NX.recordTaskTimeToggle('enable');
+        return;
+    }
+
+    //task mode (default)
+    $("#timesheet-entry-mode-task").removeClass('hidden');
+    $("#timesheet-entry-mode-client").addClass('hidden');
+
+    //client mode fields
+    $("#timesheet_clientid").prop("disabled", true).val(null).trigger('change');
+    $("#timesheet_projectid").prop("disabled", true).val(null).trigger('change');
+    $("#timer_notes").prop("disabled", true).val('');
+
+    //keep default task flow where date/time stays disabled until a task is selected
+    NX.recordTaskTimeToggle('disable');
+}
+
+/** ----------------------------------------------------------
  *  [projects & tasks]
  *   clearing and disabling the dropdown
  * -----------------------------------------------------------*/

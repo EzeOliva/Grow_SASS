@@ -19,6 +19,7 @@ use App\Http\Responses\Timesheets\UpdateResponse;
 use App\Permissions\TaskPermissions;
 use App\Repositories\TimerRepository;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Validator;
 
@@ -83,8 +84,16 @@ class Timesheets extends Controller {
      */
     public function create() {
 
+        //clients list for client-level time entries
+        $clients = \App\Models\Client::select('client_id', 'client_company_name')
+            ->where('client_id', '>', 0)
+            ->orderBy('client_company_name', 'asc')
+            ->get();
+
         //response
-        return new CreateResponse();
+        return new CreateResponse([
+            'clients' => $clients,
+        ]);
     }
 
     /**
@@ -93,16 +102,18 @@ class Timesheets extends Controller {
      */
     public function store(TaskPermissions $taskpermissions) {
 
+        $entry_mode = request('timer_entry_mode', 'task');
+
         //validate - custom error messages
         $messages = [
             'timer_created.required' => __('lang.date') . '-' . __('lang.is_required'),
         ];
 
-        //validate
-        $validator = Validator::make(request()->all(), [
-            'my_assigned_tasks' => [
+        //base validation rules
+        $rules = [
+            'timer_entry_mode' => [
                 'required',
-                Rule::exists('tasks', 'task_id'),
+                Rule::in(['task', 'client']),
             ],
             'timer_created' => [
                 'required',
@@ -116,7 +127,34 @@ class Timesheets extends Controller {
                 'required',
                 'numeric',
             ],
-        ], $messages);
+        ];
+
+        //mode-specific validation rules
+        if ($entry_mode == 'task') {
+            $rules['my_assigned_tasks'] = [
+                'required',
+                Rule::exists('tasks', 'task_id'),
+            ];
+        } else {
+            $rules['timesheet_clientid'] = [
+                'required',
+                'numeric',
+                Rule::exists('clients', 'client_id'),
+            ];
+            $rules['timesheet_projectid'] = [
+                'nullable',
+                'numeric',
+                Rule::exists('projects', 'project_id'),
+            ];
+            $rules['timer_notes'] = [
+                'nullable',
+                'string',
+                'max:2000',
+            ];
+        }
+
+        //validate
+        $validator = Validator::make(request()->all(), $rules, $messages);
 
         //validation errors
         if ($validator->fails()) {
@@ -128,15 +166,55 @@ class Timesheets extends Controller {
             abort(409, $messages);
         }
 
-        //validate if user is assigned to this task
-        if (!auth()->user()->is_admin) {
-            if (!$taskpermissions->check('assigned', request('my_assigned_tasks'))) {
-                abort(409, __('lang.you_are_now_not_assigned_to_this_task'));
+        $client_project_id = 0;
+
+        //validate mode-specific permissions
+        if ($entry_mode == 'task') {
+            if (!auth()->user()->is_admin) {
+                if (!$taskpermissions->check('assigned', request('my_assigned_tasks'))) {
+                    abort(409, __('lang.you_are_now_not_assigned_to_this_task'));
+                }
+            }
+        } else {
+            //optional project must belong to selected client
+            if (request()->filled('timesheet_projectid')) {
+                $project = \App\Models\Project::where('project_id', request('timesheet_projectid'))
+                    ->where('project_type', 'project')
+                    ->first();
+
+                if (!$project || $project->project_clientid != request('timesheet_clientid')) {
+                    abort(409, __('lang.permission_denied'));
+                }
+
+                $client_project_id = $project->project_id;
+            }
+
+            //when team member does not have global projects scope, require assignment to at least one
+            //project of that client before allowing client-level time registration
+            if (!auth()->user()->is_admin && auth()->user()->role->role_projects_scope != 'global') {
+                $projects_query = \App\Models\Project::where('project_clientid', request('timesheet_clientid'))
+                    ->where('project_type', 'project');
+
+                if ($client_project_id > 0) {
+                    $projects_query->where('project_id', $client_project_id);
+                }
+
+                $is_assigned_to_client = $projects_query
+                    ->whereHas('assigned', function ($query) {
+                        $query->where('users.id', auth()->id());
+                    })->exists();
+
+                if (!$is_assigned_to_client) {
+                    abort(409, __('lang.permission_denied'));
+                }
             }
         }
-        
-        //get task
-        $task = \App\Models\Task::Where('task_id', request('my_assigned_tasks'))->first();
+
+        $task = null;
+        if ($entry_mode == 'task') {
+            //get task
+            $task = \App\Models\Task::Where('task_id', request('my_assigned_tasks'))->first();
+        }
 
         //hours and minutes
         $hours = request('manual_time_hours') * 60 * 60;
@@ -152,10 +230,29 @@ class Timesheets extends Controller {
         $timer->timer_creatorid = request('timesheet_user');
         $timer->timer_created = request('timer_created');
         $timer->timer_time = $total;
-        $timer->timer_taskid = $task->task_id;
-        $timer->timer_projectid = $task->task_projectid;
-        $timer->timer_clientid = $task->task_clientid;
+
+        if ($entry_mode == 'task') {
+            $timer->timer_taskid = $task->task_id;
+            $timer->timer_projectid = $task->task_projectid;
+            $timer->timer_clientid = $task->task_clientid;
+        } else {
+            $timer->timer_taskid = null;
+            $timer->timer_projectid = $client_project_id;
+            $timer->timer_clientid = request('timesheet_clientid');
+        }
+
+        //store optional observation without forcing schema changes in mixed installs
+        $note = trim((string) request('timer_notes', ''));
+        if ($note != '') {
+            if (Schema::hasColumn('timers', 'timer_description')) {
+                $timer->timer_description = $note;
+            } elseif (Schema::hasColumn('timers', 'timer_mapping_type')) {
+                $timer->timer_mapping_type = $note;
+            }
+        }
+
         $timer->timer_recorded_by = auth()->id();
+        $timer->timer_stopped = \Carbon\Carbon::parse(request('timer_created'))->endOfDay()->timestamp;
         $timer->timer_status = 'stopped';
         $timer->save();
 

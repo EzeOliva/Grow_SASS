@@ -137,6 +137,11 @@
                         data-dynamic-url="{{ url('/reports/clients/overview') }}"
                         data-url="{{ url('/report/clients/overview') }}" href="javascript:void(0);"
                         role="tab">@lang('lang.overview')</a>
+                    <a class="dropdown-item js-dynamic-url js-ajax-ux-request" data-toggle="tab"
+                        data-loading-class="loading-tabs" data-loading-target="embed-content-container"
+                        data-dynamic-url="{{ url('/reports/clients/health-by-stage') }}"
+                        data-url="{{ url('/report/clients/health-by-stage') }}" href="javascript:void(0);"
+                        role="tab">Salud por etapas</a>
                     <!--[MODULES] - dynamic menu-->
                     {!! config('modules.menus.reports.clients') !!}
                 </div>

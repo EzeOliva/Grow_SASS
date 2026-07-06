@@ -5,9 +5,9 @@
     <!--PROJECTS COMPLETED-->
     @include('pages.home.client.widgets.first-row.projects-completed')
 
-    <!--INVOICES DUE-->
-    @include('pages.home.client.widgets.first-row.invoices-due')
+    <!--HEALTH STATUS-->
+    @include('pages.home.client.widgets.first-row.health-status')
 
-    <!--INVOICES OVERDUE-->
-    @include('pages.home.client.widgets.first-row.invoices-overdue')
+    <!--HEALTH SIGNALS-->
+    @include('pages.home.client.widgets.first-row.health-signals')
 </div>

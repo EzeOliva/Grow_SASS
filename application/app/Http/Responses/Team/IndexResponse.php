@@ -93,7 +93,7 @@ class IndexResponse implements Responsable {
             }
 
             //render the view and save to json
-            $html = view($template, compact('page', 'users'))->render();
+            $html = view($template, compact('page', 'users', 'adminTeamTaskStatsVisible', 'adminTeamTaskStats'))->render();
             $jsondata['dom_html'][] = array(
                 'selector' => $dom_container,
                 'action' => $dom_action,
@@ -114,7 +114,7 @@ class IndexResponse implements Responsable {
             $page['url'] = loadMoreButtonUrl($users->currentPage() + 1, request('source'));
             $page['loading_target'] = 'team-td-container';
             $page['visibility_show_load_more'] = ($users->currentPage() < $users->lastPage()) ? true : false;
-            return view('pages/team/wrapper', compact('page', 'users'))->render();
+            return view('pages/team/wrapper', compact('page', 'users', 'adminTeamTaskStatsVisible', 'adminTeamTaskStats'))->render();
         }
 
     }

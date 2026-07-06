@@ -11,6 +11,7 @@ namespace App\Repositories\Reports;
 
 use App\Models\Client;
 use App\Models\Project;
+use App\Models\Timer;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -22,14 +23,17 @@ class TimesheetReportRepository {
     protected $project;
     protected $category;
     protected $client;
+    protected $user;
+    protected $timer;
 
     /**
      * Inject dependecies
      */
-    public function __construct(Project $project, Client $client, User $user) {
+    public function __construct(Project $project, Client $client, User $user, Timer $timer) {
         $this->project = $project;
         $this->client = $client;
         $this->user = $user;
+        $this->timer = $timer;
     }
 
     /**
@@ -132,41 +136,66 @@ class TimesheetReportRepository {
         $start_date = $this->filterDates('start');
         $end_date = $this->filterDates('end');
 
-        $timesheets = $this->client->newQuery();
+        $timesheets = $this->timer->newQuery();
 
-        $timesheets->selectRaw('*');
+        $timesheets->leftJoin('clients', 'clients.client_id', '=', 'timers.timer_clientid');
+        $timesheets->leftJoin('projects', 'projects.project_id', '=', 'timers.timer_projectid');
+        $timesheets->leftJoin('users', 'users.id', '=', 'timers.timer_creatorid');
 
-        //default where
-        $timesheets->whereRaw("1 = 1");
-
-        //sum_hours
-        $timesheets->selectRaw("COALESCE((SELECT SUM(timer_time)
-                                      FROM timers
-                                      WHERE timer_status = 'stopped'
-                                      AND timer_clientid = clients.client_id
-                                      AND timer_stopped >= $start_date
-                                      AND timer_stopped <= $end_date), 0)
-                                      AS sum_hours");
+        //select grouped fields
+        $timesheets->selectRaw('timers.timer_clientid as client_id');
+        $timesheets->selectRaw('clients.client_company_name');
+        $timesheets->selectRaw('timers.timer_projectid as project_id');
+        $timesheets->selectRaw('projects.project_title');
+        $timesheets->selectRaw('timers.timer_creatorid as creator_id');
+        $timesheets->selectRaw('users.first_name');
+        $timesheets->selectRaw('users.last_name');
 
         //sum_not_invoiced
-        $timesheets->selectRaw("COALESCE((SELECT SUM(timer_time)
-                                      FROM timers
-                                      WHERE timer_status = 'stopped'
-                                      AND timer_billing_status = 'not_invoiced'
-                                      AND timer_clientid = clients.client_id
-                                      AND timer_stopped >= $start_date
-                                      AND timer_stopped <= $end_date), 0)
+        $timesheets->selectRaw("COALESCE(SUM(CASE
+                                      WHEN timers.timer_billing_status = 'not_invoiced' THEN timers.timer_time
+                                      ELSE 0
+                                      END), 0)
                                       AS sum_not_invoiced");
 
         //sum_invoiced
-        $timesheets->selectRaw("COALESCE((SELECT SUM(timer_time)
-                                      FROM timers
-                                      WHERE timer_status = 'stopped'
-                                      AND timer_billing_status = 'invoiced'
-                                      AND timer_clientid = clients.client_id
-                                      AND timer_stopped >= $start_date
-                                      AND timer_stopped <= $end_date), 0)
+        $timesheets->selectRaw("COALESCE(SUM(CASE
+                                      WHEN timers.timer_billing_status = 'invoiced' THEN timers.timer_time
+                                      ELSE 0
+                                      END), 0)
                                       AS sum_invoiced");
+
+        //sum_hours
+        $timesheets->selectRaw("COALESCE(SUM(timers.timer_time), 0)
+                                      AS sum_hours");
+
+        //default where
+        $timesheets->whereRaw('1 = 1');
+        $timesheets->where('timers.timer_status', 'stopped');
+        $timesheets->where('timers.timer_clientid', '>', 0);
+        $timesheets->where('timers.timer_stopped', '>=', $start_date);
+        $timesheets->where('timers.timer_stopped', '<=', $end_date);
+
+        //optional filter by client
+        if (request()->filled('filter_timer_clientid') && is_numeric(request('filter_timer_clientid'))) {
+            $timesheets->where('timers.timer_clientid', request('filter_timer_clientid'));
+        }
+
+        //group by client, project and collaborator
+        $timesheets->groupBy('timers.timer_clientid');
+        $timesheets->groupBy('clients.client_company_name');
+        $timesheets->groupBy('timers.timer_projectid');
+        $timesheets->groupBy('projects.project_title');
+        $timesheets->groupBy('timers.timer_creatorid');
+        $timesheets->groupBy('users.first_name');
+        $timesheets->groupBy('users.last_name');
+
+        //default sorting
+        $timesheets->orderBy('clients.client_company_name', 'asc');
+        $timesheets->orderBy('projects.project_title', 'asc');
+        $timesheets->orderBy('users.first_name', 'asc');
+        $timesheets->orderBy('users.last_name', 'asc');
+
         //page limit
         if (request()->filled('page_limit') && is_numeric(request('page_limit'))) {
             $rows = $timesheets->paginate(request('page_limit'));

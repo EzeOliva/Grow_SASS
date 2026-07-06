@@ -1,6 +1,11 @@
 <!--ALL THIRD PART JAVASCRIPTS-->
 <script src="public/vendor/js/vendor.footer.js?v={{ config('system.versioning') }}"></script>
 
+@php
+    $eventsJsVersion = @filemtime(public_path('js/core/events.js')) ?: config('system.versioning');
+    $appJsVersion = @filemtime(public_path('js/core/app.js')) ?: config('system.versioning');
+@endphp
+
 <!--nextloop.core.js-->
 <script src="public/js/core/ajax.js?v={{ config('system.versioning') }}"></script>
 
@@ -8,10 +13,10 @@
 <script src="public/js/core/boot.js?v={{ config('system.versioning') }}"></script>
 
 <!--EVENTS-->
-<script src="public/js/core/events.js?v={{ config('system.versioning') }}"></script>
+<script src="public/js/core/events.js?v={{ $eventsJsVersion }}"></script>
 
 <!--CORE-->
-<script src="public/js/core/app.js?v={{ config('system.versioning') }}"></script>
+<script src="public/js/core/app.js?v={{ $appJsVersion }}"></script>
 
 <!--SAAS EVENTS-->
 <script src="public/js/landlord/events.js?v={{ config('system.versioning') }}"></script>

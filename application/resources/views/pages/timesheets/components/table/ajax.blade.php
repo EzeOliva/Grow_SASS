@@ -32,16 +32,25 @@
 
     </td>
     <td class="timesheets_col_task">
+        @if($timesheet->timer_taskid)
         <a class="show-modal-button reset-card-modal-form js-ajax-ux-request" href="javascript:void(0)"
             data-toggle="modal" data-target="#cardModal"
             data-url="{{ urlResource('/tasks/'.$timesheet->timer_taskid) }}"
             data-loading-target="main-top-nav-bar">{{ str_limit($timesheet->task_title ?? '---', 25) }}</a>
+        @else
+        <span>{{ cleanLang(__('lang.client')) }}</span>
+        @if(!empty($timesheet->timer_observation))
+        <div class="text-muted small m-t-3">{{ str_limit($timesheet->timer_observation, 80) }}</div>
+        @endif
+        @endif
     </td>
     @if(config('visibility.timesheets_col_related'))
     <td class="timesheets_col_related">
         @if($timesheet->timer_projectid > 0)
         <a
             href="/projects/{{ $timesheet->timer_projectid }}">{{ str_limit($timesheet->project_title ?? '---', 25) }}</a>
+        @elseif($timesheet->timer_clientid > 0)
+        <a href="/clients/{{ $timesheet->timer_clientid }}">{{ str_limit($timesheet->client_company_name ?? '---', 25) }}</a>
         @else
         <a href="/leads/{{ $timesheet->timer_leadid }}">{{ str_limit($timesheet->lead_title ?? '---', 25) }}</a>
         @endif

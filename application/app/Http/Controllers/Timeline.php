@@ -11,6 +11,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\Timeline\IndexResponse;
+use App\Models\Comment;
+use App\Models\Event;
+use App\Models\Note;
 use App\Permissions\ProjectPermissions;
 use App\Repositories\ClientRepository;
 use App\Repositories\EventRepository;
@@ -103,6 +106,11 @@ class Timeline extends Controller {
         //basic settings
         $page = [];
 
+        //keep timeline complete for legacy data that may not have created events
+        if (request()->filled('timelineclient_id') && (int) request('page', 1) === 1) {
+            $this->backfillClientTimelineEvents((int) request('timelineclient_id'));
+        }
+
         //filter
         request()->merge([
             'eventresource_type' => request('timelineresource_type'),
@@ -139,6 +147,121 @@ class Timeline extends Controller {
 
         //response
         return new IndexResponse($payload);
+    }
+
+    /**
+     * Backfill missing timeline events for client-related data.
+     *
+     * This keeps client chronology consistent with legacy records where
+     * events may not have been generated at creation time.
+     *
+     * @param int $clientId
+     * @return void
+     */
+    private function backfillClientTimelineEvents($clientId = 0) {
+
+        if (!is_numeric($clientId) || (int) $clientId <= 0) {
+            return;
+        }
+
+        $clients = $this->clientrepo->search((int) $clientId);
+        if (!$client = $clients->first()) {
+            return;
+        }
+
+        //missing project-level comment events
+        $projectComments = Comment::query()
+            ->leftJoin('projects', 'projects.project_id', '=', 'comments.commentresource_id')
+            ->leftJoin('events as existing_events', function ($join) use ($clientId) {
+                $join->on('existing_events.event_item_id', '=', 'comments.comment_id')
+                    ->where('existing_events.event_item', '=', 'comment')
+                    ->where('existing_events.event_clientid', '=', (int) $clientId);
+            })
+            ->where('comments.commentresource_type', 'project')
+            ->where('projects.project_clientid', (int) $clientId)
+            ->whereNull('existing_events.event_id')
+            ->select([
+                'comments.comment_id',
+                'comments.comment_text',
+                'comments.comment_creatorid',
+                'comments.comment_created',
+                'projects.project_id',
+                'projects.project_title',
+                'projects.project_clientid',
+            ])
+            ->get();
+
+        foreach ($projectComments as $comment) {
+            $eventId = $this->eventrepo->create([
+                'event_creatorid' => (int) ($comment->comment_creatorid ?? 0),
+                'event_clientid' => (int) ($comment->project_clientid ?? $clientId),
+                'event_item' => 'comment',
+                'event_item_id' => (int) $comment->comment_id,
+                'event_item_lang' => 'event_posted_a_comment',
+                'event_item_content' => $comment->comment_text ?? '',
+                'event_parent_type' => 'project',
+                'event_parent_id' => (int) ($comment->project_id ?? 0),
+                'event_parent_title' => $comment->project_title ?? '',
+                'event_show_item' => 'yes',
+                'event_show_in_timeline' => 'yes',
+                'eventresource_type' => 'project',
+                'eventresource_id' => (int) ($comment->project_id ?? 0),
+                'event_notification_category' => 'notifications_projects_activity',
+            ]);
+
+            if ($eventId && !empty($comment->comment_created)) {
+                Event::where('event_id', $eventId)->update([
+                    'event_created' => $comment->comment_created,
+                    'event_updated' => $comment->comment_created,
+                ]);
+            }
+        }
+
+        //missing client note events
+        $clientNotes = Note::query()
+            ->leftJoin('events as existing_events', function ($join) use ($clientId) {
+                $join->on('existing_events.event_item_id', '=', 'notes.note_id')
+                    ->where('existing_events.event_item', '=', 'note')
+                    ->where('existing_events.event_clientid', '=', (int) $clientId);
+            })
+            ->where('notes.noteresource_type', 'client')
+            ->where('notes.noteresource_id', (int) $clientId)
+            ->whereNull('existing_events.event_id')
+            ->select([
+                'notes.note_id',
+                'notes.note_title',
+                'notes.note_description',
+                'notes.note_creatorid',
+                'notes.note_created',
+            ])
+            ->get();
+
+        foreach ($clientNotes as $note) {
+            $eventId = $this->eventrepo->create([
+                'event_creatorid' => (int) ($note->note_creatorid ?? 0),
+                'event_clientid' => (int) $clientId,
+                'event_item' => 'note',
+                'event_item_id' => (int) $note->note_id,
+                'event_item_lang' => 'Se registró una nota del cliente',
+                'event_item_content' => $note->note_title ?? '',
+                'event_item_content2' => $note->note_description ?? '',
+                'event_parent_type' => 'client',
+                'event_parent_id' => (int) $clientId,
+                'event_parent_title' => $client->client_company_name ?? '',
+                'event_show_item' => 'yes',
+                'event_show_in_timeline' => 'yes',
+                'eventresource_type' => 'client',
+                'eventresource_id' => (int) $clientId,
+                'event_notification_category' => '',
+            ]);
+
+            if ($eventId && !empty($note->note_created)) {
+                Event::where('event_id', $eventId)->update([
+                    'event_created' => $note->note_created,
+                    'event_updated' => $note->note_created,
+                ]);
+            }
+        }
     }
 
     /**

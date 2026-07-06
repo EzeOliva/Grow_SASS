@@ -56,13 +56,14 @@ class ClientAIAnalysis extends Controller
 
     public function analyze(Request $request, $clientId)
     {
-        $prompt = $this->repo->generateComprehensiveClientPrompt($clientId);
+        $period = 'quarter';
+        $prompt = $this->repo->generateClientHealthAnalysisPrompt($clientId, $period);
 
         try {
             $messages = [
                 [
                     'role' => 'system',
-                    'content' => 'Eres un asistente experto en análisis de clientes. Responde con claridad y eficacia.'
+                    'content' => 'Eres una inteligencia artificial experta en Customer Success. Entregas informes de salud del cliente con foco en riesgo, retención y plan de acción.'
                 ],
                 [
                     'role' => 'user',
@@ -79,7 +80,11 @@ class ClientAIAnalysis extends Controller
                 ['role' => 'assistant', 'content' => $aiAnswer]
             ]]);
 
-            return response()->json(['success' => true, 'result' => $aiAnswer ?? 'No response from AI.']);
+            return response()->json([
+                'success' => true,
+                'result' => $aiAnswer ?? 'No response from AI.',
+                'period' => $period,
+            ]);
             
         } catch (\OpenAI\Exceptions\RateLimitException $e) {
             return response()->json(['success' => false, 'message' => 'Rate limit exceeded.']);
@@ -89,6 +94,8 @@ class ClientAIAnalysis extends Controller
             return response()->json(['success' => false, 'message' => 'AI error: ' . $e->getMessage()]);
         } catch (\OpenAI\Exceptions\TransporterException $e) {
             return response()->json(['success' => false, 'message' => 'Connection error.']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'AI analysis failed: ' . $e->getMessage()]);
         }
     }
 

@@ -99,14 +99,216 @@ class Team extends Controller {
         ]);
         $users = $this->userrepo->search();
 
+        //admin only - private productivity snapshot
+        $adminTeamTaskStatsVisible = (bool) (config('visibility.action_super_user') ?? false);
+        $adminTeamTaskStats = $adminTeamTaskStatsVisible ? $this->getAdminCompletedTasksByMemberStats() : collect();
+
         //reponse payload
         $payload = [
             'page' => $this->pageSettings('team'),
             'users' => $users,
+            'adminTeamTaskStatsVisible' => $adminTeamTaskStatsVisible,
+            'adminTeamTaskStats' => $adminTeamTaskStats,
         ];
 
         //show views
         return new IndexResponse($payload);
+    }
+
+    /**
+     * Admin-only metrics: completed tasks by team member for last 7, 30, 60 and 90 days.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    private function getAdminCompletedTasksByMemberStats()
+    {
+        $weekStart = now()->copy()->subDays(7);
+        $monthStart = now()->copy()->subDays(30);
+        $sixtyDaysStart = now()->copy()->subDays(60);
+        $ninetyDaysStart = now()->copy()->subDays(90);
+        $completedCondition = $this->getCompletedTaskConditionSql();
+
+        return DB::table('users')
+            ->leftJoin('roles', 'roles.role_id', '=', 'users.role_id')
+            ->leftJoin('tasks_assigned', 'tasks_assigned.tasksassigned_userid', '=', 'users.id')
+            ->leftJoin('tasks', 'tasks.task_id', '=', 'tasks_assigned.tasksassigned_taskid')
+            ->leftJoin('tasks_status', 'tasks_status.taskstatus_id', '=', 'tasks.task_status')
+            ->where('users.type', 'team')
+            ->where('users.status', 'active')
+            ->groupBy(
+                'users.id',
+                'users.first_name',
+                'users.last_name',
+                'users.position',
+                'roles.role_name'
+            )
+            ->select(
+                'users.id',
+                'users.first_name',
+                'users.last_name',
+                'users.position',
+                'roles.role_name'
+            )
+            ->selectRaw(
+                "COUNT(DISTINCT CASE WHEN {$completedCondition} AND tasks.task_updated >= ? THEN tasks.task_id END) as completed_last_week",
+                [$weekStart]
+            )
+            ->selectRaw(
+                "COUNT(DISTINCT CASE WHEN {$completedCondition} AND tasks.task_updated >= ? THEN tasks.task_id END) as completed_last_month",
+                [$monthStart]
+            )
+            ->selectRaw(
+                "COUNT(DISTINCT CASE WHEN {$completedCondition} AND tasks.task_updated >= ? THEN tasks.task_id END) as completed_last_60_days",
+                [$sixtyDaysStart]
+            )
+            ->selectRaw(
+                "COUNT(DISTINCT CASE WHEN {$completedCondition} AND tasks.task_updated >= ? THEN tasks.task_id END) as completed_last_90_days",
+                [$ninetyDaysStart]
+            )
+            ->orderByDesc('completed_last_90_days')
+            ->orderByDesc('completed_last_60_days')
+            ->orderByDesc('completed_last_month')
+            ->orderByDesc('completed_last_week')
+            ->orderBy('users.first_name')
+            ->get();
+    }
+
+    /**
+     * Admin-only modal content with completed tasks detail per member.
+     *
+     * @param int $id Team member id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function adminCompletedTasksModal($id)
+    {
+        if (!$this->canViewAdminTeamTaskStats()) {
+            abort(403);
+        }
+
+        $member = DB::table('users')
+            ->leftJoin('roles', 'roles.role_id', '=', 'users.role_id')
+            ->where('users.id', $id)
+            ->where('users.type', 'team')
+            ->select('users.id', 'users.first_name', 'users.last_name', 'users.position', 'roles.role_name')
+            ->first();
+
+        if (!$member) {
+            abort(404);
+        }
+
+        $weekStart = now()->copy()->subDays(7);
+        $monthStart = now()->copy()->subDays(30);
+        $sixtyDaysStart = now()->copy()->subDays(60);
+        $ninetyDaysStart = now()->copy()->subDays(90);
+
+        $completedLastWeekTasks = $this->getCompletedTasksByMemberSince($id, $weekStart);
+        $completedLastMonthTasks = $this->getCompletedTasksByMemberSince($id, $monthStart);
+        $completedLastSixtyDaysTasks = $this->getCompletedTasksByMemberSince($id, $sixtyDaysStart);
+        $completedLastNinetyDaysTasks = $this->getCompletedTasksByMemberSince($id, $ninetyDaysStart);
+
+        $html = view('pages.team.components.table.modals.admin-completed-tasks-list', [
+            'member' => $member,
+            'completedLastWeekTasks' => $completedLastWeekTasks,
+            'completedLastMonthTasks' => $completedLastMonthTasks,
+            'completedLastSixtyDaysTasks' => $completedLastSixtyDaysTasks,
+            'completedLastNinetyDaysTasks' => $completedLastNinetyDaysTasks,
+        ])->render();
+
+        return response()->json([
+            'dom_html' => [
+                [
+                    'selector' => '#commonModalBody',
+                    'action' => 'replace',
+                    'value' => $html,
+                ],
+            ],
+            'dom_visibility' => [
+                [
+                    'selector' => '#commonModalFooter',
+                    'action' => 'hide',
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Determines if current user can view admin-only team task stats.
+     *
+     * @return bool
+     */
+    private function canViewAdminTeamTaskStats()
+    {
+        if (!auth()->check()) {
+            return false;
+        }
+
+        $user = auth()->user();
+        $roleTeamLevel = optional($user->role)->role_team;
+
+        return (bool) ($user->is_admin || (int) $roleTeamLevel === 3);
+    }
+
+    /**
+     * Returns SQL condition that determines if a task is considered completed.
+     *
+     * @return string
+     */
+    private function getCompletedTaskConditionSql()
+    {
+        $completedStatusValues = [
+            '2',
+            'completed',
+            'complete',
+            'done',
+            'closed',
+            'completado',
+            'completada',
+            'finalizado',
+            'finalizada',
+        ];
+
+        $quotedStatusValues = "'" . implode("','", $completedStatusValues) . "'";
+
+        return "(
+            LOWER(CAST(tasks.task_status AS CHAR)) IN ({$quotedStatusValues})
+            OR LOWER(COALESCE(tasks_status.taskstatus_title, '')) IN ({$quotedStatusValues})
+            OR LOWER(COALESCE(tasks_status.taskstatus_title, '')) LIKE '%complet%'
+            OR LOWER(COALESCE(tasks_status.taskstatus_title, '')) LIKE '%finaliz%'
+        )";
+    }
+
+    /**
+     * Get completed tasks for a team member from a given date.
+     *
+     * @param int $memberId
+     * @param mixed $fromDate
+     * @return \Illuminate\Support\Collection
+     */
+    private function getCompletedTasksByMemberSince($memberId, $fromDate)
+    {
+        $completedCondition = $this->getCompletedTaskConditionSql();
+
+        return DB::table('tasks_assigned')
+            ->join('tasks', 'tasks.task_id', '=', 'tasks_assigned.tasksassigned_taskid')
+            ->leftJoin('tasks_status', 'tasks_status.taskstatus_id', '=', 'tasks.task_status')
+            ->leftJoin('projects', 'projects.project_id', '=', 'tasks.task_projectid')
+            ->where('tasks_assigned.tasksassigned_userid', $memberId)
+            ->where('tasks.task_updated', '>=', $fromDate)
+            ->whereRaw($completedCondition)
+            ->select(
+                'tasks.task_id',
+                'tasks.task_title',
+                'tasks.task_updated',
+                'tasks.task_date_due',
+                'tasks.task_status',
+                'tasks_status.taskstatus_title',
+                'projects.project_id',
+                'projects.project_title'
+            )
+            ->distinct()
+            ->orderByDesc('tasks.task_updated')
+            ->limit(250)
+            ->get();
     }
 
     /**

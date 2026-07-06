@@ -1,6 +1,6 @@
 <!-- Todays Payments -->
-<div class="col-lg-3 col-md-6">
-    <div class="card">
+<div class="col-lg-3 col-md-6 d-flex">
+    <div class="card w-100 h-100 d-flex flex-column">
         <div class="card-body p-l-15 p-r-15">
             <div class="d-flex p-10 no-block">
                 <span class="align-slef-center">

@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-md" id="basicModalContainer">
+<div class="modal-dialog modal-lg" id="basicModalContainer">
     @php
         $feedbackImpact = $feedbackImpact ?? [];
         $tasksCompleted = (int) ($feedbackImpact['tasks_completed'] ?? 0);
@@ -8,7 +8,7 @@
         $hasImpactSummary = ($tasksCompleted + $trainingsCount + $expectationsMet + $meetingsCount) > 0;
     @endphp
 
-    <form action="" method="post" id="feedbackForm" class="form-horizontal">
+    <form action="" method="post" id="feedbackForm" class="form-horizontal" data-client-id="{{ (int) (auth()->user()->clientid ?? 0) }}" data-suggest-url="{{ route('feedbacks.suggest-review', ['client' => (int) (auth()->user()->clientid ?? 0)]) }}">
         <div class="modal-content">
             <div class="modal-header" id="basicModalHeader">
                 <h2 class="mb-4 text-center"><i class="fa-regular fa-star-half-stroke mr-1"></i>{{ __('lang.customer_feedback') }}</h2>
@@ -79,15 +79,15 @@
                 <div class="form-group">
                     <label for="comment"><strong>{{ __('lang.comment') }}</strong> <small class="text-muted">({{ __('lang.optional') }})</small></label>
                     {{-- {{var_dump($feedbackQueries)}} --}}
-                    <textarea class="form-control" id="comment" rows="3"></textarea>
+                    <textarea class="form-control" id="comment" rows="6" style="resize: vertical; min-height: 120px;"></textarea>
+                    <small class="text-muted mt-1 d-block"><i class="fas fa-magic mr-1"></i>La sugerencia es generada por IA en base al puntaje, tareas, capacitaciones y otros datos del período. Podés editarla libremente.</small>
                 </div>
             </div>
-            <div class="modal-footer" id="basicModalFooter">
+            <div class="modal-footer d-flex flex-column" id="basicModalFooter">
                     <button type="submit" class="btn btn-primary btn-block">{{ __('lang.send') }}</button>
-                    {{-- <button type="button" id="basicModalCloseButton" class="btn btn-rounded-x btn-secondary waves-effect text-left" data-dismiss="modal">{{ cleanLang(__('lang.close')) }}</button>
-                    <button type="submit" id="basicModalSubmitButton"
-                        class="btn btn-rounded-x btn-danger waves-effect text-left basicModalSubmitButton" data-url="" data-loading-target=""
-                        data-ajax-type="POST" data-on-start-submit-button="disable">{{ cleanLang(__('lang.submit')) }}</button> --}}
+                    @if(auth()->user()->is_client)
+                    <a href="/feedback/skip" class="btn btn-link btn-sm text-muted mt-2">Completar más tarde</a>
+                    @endif
             </div>
         </div>
     </form>

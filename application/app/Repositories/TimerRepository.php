@@ -46,6 +46,13 @@ class TimerRepository {
         // all client fields
         $timers->selectRaw('*');
 
+        //observation field fallback for mixed database versions
+        if (Schema::hasColumn('timers', 'timer_description')) {
+            $timers->selectRaw('timers.timer_description as timer_observation');
+        } elseif (Schema::hasColumn('timers', 'timer_mapping_type')) {
+            $timers->selectRaw('timers.timer_mapping_type as timer_observation');
+        }
+
         $timers->selectRaw('(SELECT CONCAT(first_name, " ", last_name) FROM users WHERE id = timers.timer_recorded_by) as recorded_by_name');
 
         //sum all of a tasks total timers

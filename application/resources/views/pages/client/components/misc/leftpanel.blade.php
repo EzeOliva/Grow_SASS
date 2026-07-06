@@ -60,64 +60,6 @@
     <div>
         <hr>
     </div>
-    <div class="card-body p-t-0 p-b-0">
-        <div>
-            <table class="table no-border m-b-0">
-                <tbody>
-                    <!--invoices-->
-                    @if (config('visibility.role_invoices'))
-                        <tr>
-                            <td class="p-l-0 p-t-5" id="fx-client-left-panel-invoices">
-                                {{ cleanLang(__('lang.invoices')) }}
-                            </td>
-                            <td class="font-medium p-r-0 p-t-5">
-                                {{ runtimeMoneyFormat($client->sum_invoices_all) }}
-                                <div class="progress">
-                                    <div class="progress-bar bg-info  w-100 h-px-3" role="progressbar"
-                                        aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                            </td>
-                        </tr>
-                    @endif
-                    <!--payments-->
-                    @if (config('visibility.role_payments'))
-                        <tr>
-                            <td class="p-l-0 p-t-5">{{ cleanLang(__('lang.payments')) }}</td>
-                            <td class="font-medium p-r-0 p-t-5">{{ runtimeMoneyFormat($client->sum_all_payments) }}
-                                <div class="progress">
-                                    <div class="progress-bar bg-success w-100 h-px-3" role="progressbar"
-                                        aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                            </td>
-                        </tr>
-                    @endif
-                    <!--completed projects-->
-                    <tr>
-                        <td class="p-l-0 p-t-5">{{ cleanLang(__('lang.completed_projects')) }}</td>
-                        <td class="font-medium p-r-0 p-t-5">{{ $client->count_projects_completed }}
-                            <div class="progress">
-                                <div class="progress-bar bg-warning  w-100 h-px-3" role="progressbar" aria-valuenow="25"
-                                    aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
-                        </td>
-                    </tr>
-                    <!--open projects-->
-                    <tr>
-                        <td class="p-l-0 p-t-5">{{ cleanLang(__('lang.open_projects')) }}</td>
-                        <td class="font-medium p-r-0 p-t-5">{{ $client->count_projects_pending }}
-                            <div class="progress">
-                                <div class="progress-bar bg-danger w-100 h-px-3" role="progressbar" aria-valuenow="25"
-                                    aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <div>
-        <hr>
-    </div>
     <!--client address-->
     <div class="card-body p-t-0 p-b-0">
         <small class="text-muted">{{ cleanLang(__('lang.address')) }}</small>
@@ -234,6 +176,76 @@
                 @elseif($stats['health_status'] === 'yellow') text-warning
                 @else text-danger @endif">
                     {{ ucfirst($stats['health_status']) }}
+                </div>
+            </div>
+        </div>
+
+        {{-- Financial and project indicators (collapsed by default) --}}
+        <div class="card customer-success-block mb-3">
+            <div class="card-body p-0">
+                <a class="d-flex justify-content-between align-items-center p-3 text-dark collapsed" data-toggle="collapse"
+                    href="#client-financial-project-stats" role="button" aria-expanded="false"
+                    aria-controls="client-financial-project-stats">
+                    <span>
+                        <i class="fas fa-chart-line text-info mr-2"></i>
+                        Facturas, pagos y proyectos
+                    </span>
+                    <i class="ti-angle-down"></i>
+                </a>
+
+                <div id="client-financial-project-stats" class="collapse">
+                    <div class="px-3 pb-3">
+                        <table class="table no-border m-b-0">
+                            <tbody>
+                                @if (config('visibility.role_invoices'))
+                                    <tr>
+                                        <td class="p-l-0 p-t-5" id="fx-client-left-panel-invoices">
+                                            {{ cleanLang(__('lang.invoices')) }}
+                                        </td>
+                                        <td class="font-medium p-r-0 p-t-5">
+                                            {{ runtimeMoneyFormat($client->sum_invoices_all) }}
+                                            <div class="progress">
+                                                <div class="progress-bar bg-info w-100 h-px-3" role="progressbar"
+                                                    aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+
+                                @if (config('visibility.role_payments'))
+                                    <tr>
+                                        <td class="p-l-0 p-t-5">{{ cleanLang(__('lang.payments')) }}</td>
+                                        <td class="font-medium p-r-0 p-t-5">{{ runtimeMoneyFormat($client->sum_all_payments) }}
+                                            <div class="progress">
+                                                <div class="progress-bar bg-success w-100 h-px-3" role="progressbar"
+                                                    aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+
+                                <tr>
+                                    <td class="p-l-0 p-t-5">{{ cleanLang(__('lang.completed_projects')) }}</td>
+                                    <td class="font-medium p-r-0 p-t-5">{{ $client->count_projects_completed }}
+                                        <div class="progress">
+                                            <div class="progress-bar bg-warning w-100 h-px-3" role="progressbar"
+                                                aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="p-l-0 p-t-5">{{ cleanLang(__('lang.open_projects')) }}</td>
+                                    <td class="font-medium p-r-0 p-t-5">{{ $client->count_projects_pending }}
+                                        <div class="progress">
+                                            <div class="progress-bar bg-danger w-100 h-px-3" role="progressbar"
+                                                aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

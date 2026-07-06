@@ -1,1 +1,0 @@
-<?php echo cleanEmail($content); ?><?php /**PATH /home/tasklist/public_html/application/resources/views/pages/emails/template.blade.php ENDPATH**/ ?>

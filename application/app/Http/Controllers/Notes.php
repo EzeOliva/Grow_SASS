@@ -20,6 +20,7 @@ use App\Http\Responses\Notes\UpdateResponse;
 use App\Permissions\NotePermissions;
 use App\Repositories\AttachmentRepository;
 use App\Repositories\CategoryRepository;
+use App\Repositories\EventRepository;
 use App\Repositories\NoteRepository;
 use App\Repositories\TagRepository;
 use App\Repositories\UserRepository;
@@ -145,7 +146,7 @@ class Notes extends Controller {
      * Store a newly created note in storage.
      * @return \Illuminate\Http\Response
      */
-    public function store() {
+    public function store(EventRepository $eventrepo) {
 
         $messages = [];
 
@@ -207,6 +208,11 @@ class Notes extends Controller {
 
         //get the note object (friendly for rendering in blade template)
         $notes = $this->noterepo->search($note_id);
+
+        //record event in client timeline when applicable
+        if ($note = $notes->first()) {
+            $this->recordClientNoteTimelineEvent($eventrepo, $note, 'created');
+        }
 
         //permissions
         $this->applyPermissions($notes->first());
@@ -296,7 +302,7 @@ class Notes extends Controller {
      * @param int $id note id
      * @return \Illuminate\Http\Response
      */
-    public function update($id) {
+    public function update($id, EventRepository $eventrepo) {
 
         //custom error messages
         $messages = [];
@@ -361,6 +367,11 @@ class Notes extends Controller {
         //get note
         $notes = $this->noterepo->search($id);
 
+        //record event in client timeline when applicable
+        if ($note = $notes->first()) {
+            $this->recordClientNoteTimelineEvent($eventrepo, $note, 'updated');
+        }
+
         $this->applyPermissions($notes->first());
 
         //reponse payload
@@ -377,9 +388,16 @@ class Notes extends Controller {
      * @param int $id note id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id) {
+    public function destroy($id, EventRepository $eventrepo) {
 
         $note = \App\Models\Note::Where('note_id', $id)->first();
+
+        if (!$note) {
+            abort(404, __('lang.note_not_found'));
+        }
+
+        //record event before deleting the note data
+        $this->recordClientNoteTimelineEvent($eventrepo, $note, 'deleted');
 
         //remove the item
         $note->delete();
@@ -391,6 +409,53 @@ class Notes extends Controller {
 
         //generate a response
         return new DestroyResponse($payload);
+    }
+
+    /**
+     * Record note activity in client timeline for notes linked to a client.
+     *
+     * @param \App\Repositories\EventRepository $eventrepo
+     * @param \App\Models\Note $note
+     * @param string $action created|updated|deleted
+     * @return void
+     */
+    private function recordClientNoteTimelineEvent(EventRepository $eventrepo, $note, $action = 'created') {
+
+        if (!($note instanceof \App\Models\Note)) {
+            return;
+        }
+
+        if ($note->noteresource_type !== 'client' || !is_numeric($note->noteresource_id)) {
+            return;
+        }
+
+        if (!$client = \App\Models\Client::Where('client_id', $note->noteresource_id)->first()) {
+            return;
+        }
+
+        $labels = [
+            'created' => 'Se registró una nota del cliente',
+            'updated' => 'Se actualizó una nota del cliente',
+            'deleted' => 'Se eliminó una nota del cliente',
+        ];
+
+        $eventrepo->create([
+            'event_creatorid' => auth()->id() ?: (int) ($note->note_creatorid ?? 0),
+            'event_clientid' => (int) $client->client_id,
+            'event_item' => 'note',
+            'event_item_id' => (int) $note->note_id,
+            'event_item_lang' => $labels[$action] ?? $labels['updated'],
+            'event_item_content' => (string) ($note->note_title ?? ''),
+            'event_item_content2' => (string) ($note->note_description ?? ''),
+            'event_parent_type' => 'client',
+            'event_parent_id' => (int) $client->client_id,
+            'event_parent_title' => (string) ($client->client_company_name ?? ''),
+            'event_show_item' => 'yes',
+            'event_show_in_timeline' => 'yes',
+            'eventresource_type' => 'client',
+            'eventresource_id' => (int) $client->client_id,
+            'event_notification_category' => '',
+        ]);
     }
 
     /**

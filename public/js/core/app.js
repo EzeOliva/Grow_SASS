@@ -2924,27 +2924,200 @@ function NXFeedbackLists() {
  * @description: edit feedback modal
  * -------------------------------------------------------------------------------------*/
 function NXAddEditFeedback() {
-  $(document).ready(function () {
-    // Button selection
-    $(document).on("click", 'button[data-question]', function () {
-      const qid = $(this).data('question');
-      $(`button[data-question="${qid}"]`).removeClass('btn-primary').addClass('btn-outline-info');
-      $(this).removeClass('btn-outline-info').addClass('btn-primary');
+  const $form = $("#feedbackForm");
+  const $comment = $("#comment");
+  if (!$form.length) {
+    return;
+  }
+  const clientId = parseInt($form.data('client-id') || 0, 10);
+  const suggestUrl = String($form.data('suggest-url') || '').trim() || `/feedbacks/${isNaN(clientId) ? 0 : clientId}/suggest-review`;
+  let aiRequestTimer = null;
+  let aiRequestInFlight = false;
+  let aiRequestQueued = false;
+  let aiLastRequestKey = '';
+  let aiLastAppliedSuggestion = '';
+  const manualSelections = {};
+
+  const collectSuggestionDetails = function () {
+    const detailsByQuestion = {};
+
+    $('#questions-container .form-group').each(function () {
+      const btn = $(this).find('button.btn-primary[data-question], button.feedback-mark-button.active[data-question]').first();
+      if (btn.length) {
+        const qid = parseInt(btn.data('question'), 10);
+        const value = parseInt(btn.data('value'), 10);
+        if (!isNaN(qid) && !isNaN(value)) {
+          detailsByQuestion[qid] = value;
+        }
+      }
+
+      const starDiv = $(this).find('div[data-question]');
+      if (starDiv.length && starDiv.data('selected') !== undefined) {
+        const qid = parseInt(starDiv.data('question'), 10);
+        const value = parseInt(starDiv.data('selected'), 10);
+        if (!isNaN(qid) && !isNaN(value)) {
+          detailsByQuestion[qid] = value;
+        }
+      }
+
+      const select = $(this).find('select[data-question]');
+      if (select.length) {
+        const qid = parseInt(select.data('question'), 10);
+        const value = parseInt(select.val(), 10);
+        if (!isNaN(qid) && !isNaN(value)) {
+          detailsByQuestion[qid] = value;
+        }
+      }
     });
 
-    // Star selection
-    $(document).on("click", '.editable.fa-star', function () {
-      console.log('sdfas');
-      const value = $(this).data("value");
-      const parent = $(this).parent();
-      parent.find(".editable.fa-star").removeClass("fas").addClass("far");
-      parent.find(".editable.fa-star").each(function () {
-        if ($(this).data("value") <= value) {
-          $(this).removeClass("far").addClass("fas");
+    Object.keys(manualSelections).forEach(function (questionId) {
+      const qid = parseInt(questionId, 10);
+      const value = parseInt(manualSelections[questionId], 10);
+      if (!isNaN(qid) && !isNaN(value)) {
+        detailsByQuestion[qid] = value;
+      }
+    });
+
+    return Object.keys(detailsByQuestion).map((questionId) => ({
+      feedback_query_id: parseInt(questionId, 10),
+      value: detailsByQuestion[questionId]
+    }));
+  };
+
+  const canAutoFillComment = function () {
+    if (!$comment.length) {
+      return false;
+    }
+    const currentComment = String($comment.val() || '').trim();
+    return currentComment === '' || currentComment === aiLastAppliedSuggestion;
+  };
+
+  const applySuggestionToComment = function (suggestion) {
+    if (!suggestion || !canAutoFillComment()) {
+      return;
+    }
+    aiLastAppliedSuggestion = suggestion;
+    $comment.val(suggestion);
+  };
+
+  const buildFallbackSuggestion = function (details) {
+    if (!Array.isArray(details) || !details.length) {
+      return '';
+    }
+
+    const avg = details.reduce(function (sum, row) {
+      return sum + (parseInt(row.value, 10) || 0);
+    }, 0) / details.length;
+
+    if (avg >= 8) {
+      return 'Muy conforme con Legajos Online. El servicio fue claro, rapido y con muy buena atencion en general.';
+    }
+    if (avg >= 6) {
+      return 'Mi experiencia con Legajos Online fue buena. Hay varios puntos positivos y tambien oportunidades para seguir mejorando.';
+    }
+    return 'Valoro el trabajo del equipo de Legajos Online. Seria bueno mejorar algunos tiempos y la resolucion de ciertos puntos para la proxima.';
+  };
+
+  const requestSuggestion = function () {
+    if (!suggestUrl || !$form.length) {
+      return;
+    }
+
+    const details = collectSuggestionDetails();
+    if (!details.length) {
+      return;
+    }
+
+    const requestKey = JSON.stringify(details);
+    if (requestKey === aiLastRequestKey && aiLastAppliedSuggestion) {
+      return;
+    }
+
+    if (aiRequestInFlight) {
+      aiRequestQueued = true;
+      return;
+    }
+
+    aiRequestInFlight = true;
+    aiLastRequestKey = requestKey;
+
+    $.ajax({
+      type: 'POST',
+      url: suggestUrl,
+      headers: {
+        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+      },
+      data: {
+        _token: $('meta[name="csrf-token"]').attr('content'),
+        details: details
+      }
+    })
+      .done(function (response) {
+        const suggestion = (response && typeof response.suggestion === 'string')
+          ? response.suggestion.trim()
+          : '';
+        applySuggestionToComment(suggestion || buildFallbackSuggestion(details));
+      })
+      .fail(function () {
+        applySuggestionToComment(buildFallbackSuggestion(details));
+      })
+      .always(function () {
+        aiRequestInFlight = false;
+        if (aiRequestQueued) {
+          aiRequestQueued = false;
+          requestSuggestion();
         }
       });
-      parent.data("selected", value);
+  };
+
+  const scheduleSuggestionRequest = function () {
+    if (!suggestUrl || !$form.length) {
+      return;
+    }
+    window.clearTimeout(aiRequestTimer);
+    aiRequestTimer = window.setTimeout(requestSuggestion, 600);
+  };
+
+  // Button selection
+  $(document).off("click.feedback-question", '#feedbackForm button[data-question]').on("click.feedback-question", '#feedbackForm button[data-question]', function () {
+    const qid = parseInt($(this).data('question'), 10);
+    const value = parseInt($(this).data('value'), 10);
+    if (!isNaN(qid)) {
+      $(`#feedbackForm button[data-question="${qid}"]`).removeClass('btn-primary active btn-outline-secondary').addClass('btn-outline-info');
+    }
+    $(this).removeClass('btn-outline-info btn-outline-secondary').addClass('btn-primary active');
+    if (!isNaN(qid) && !isNaN(value)) {
+      manualSelections[qid] = value;
+    }
+    scheduleSuggestionRequest();
+  });
+
+  // Star selection
+  $(document).off("click.feedback-star", '#feedbackForm .editable.fa-star').on("click.feedback-star", '#feedbackForm .editable.fa-star', function () {
+    const value = $(this).data("value");
+    const parent = $(this).parent();
+    parent.find(".editable.fa-star").removeClass("fas").addClass("far");
+    parent.find(".editable.fa-star").each(function () {
+      if ($(this).data("value") <= value) {
+        $(this).removeClass("far").addClass("fas");
+      }
     });
+    parent.data("selected", value);
+    const qid = parseInt(parent.data('question'), 10);
+    if (!isNaN(qid) && !isNaN(parseInt(value, 10))) {
+      manualSelections[qid] = parseInt(value, 10);
+    }
+    scheduleSuggestionRequest();
+  });
+
+  // Select question changes
+  $(document).off('change.feedback-select', '#feedbackForm #questions-container select[data-question]').on('change.feedback-select', '#feedbackForm #questions-container select[data-question]', function () {
+    const qid = parseInt($(this).data('question'), 10);
+    const value = parseInt($(this).val(), 10);
+    if (!isNaN(qid) && !isNaN(value)) {
+      manualSelections[qid] = value;
+    }
+    scheduleSuggestionRequest();
   });
 
   const getAllValues = function () {
@@ -2994,6 +3167,7 @@ function NXAddEditFeedback() {
     const url = status === 'edit' ? 'feedback/edit/' + id : 'feedback/create';
     const method = status === 'edit' ? 'PUT' : 'POST';
     const results = validator();
+    window.clearTimeout(aiRequestTimer);
     if (!results) {
       NX.notification({
         type: 'error',
@@ -3028,7 +3202,7 @@ function NXAddEditFeedback() {
   }
 
   // Form submit
-  $("#feedbackForm").submit(function (e) {
+  $form.off('submit.feedback').on('submit.feedback', function (e) {
     e.preventDefault();
     submitHandler();
   });
@@ -4118,6 +4292,14 @@ function NXRecordMyTmeModal() {
   //disable the submit button and form fields
   NX.recordTaskTimeToggle('disable');
 
+  //set the entry mode state
+  if ($("#timer_entry_mode").length) {
+    $("#timer_entry_mode").off("change.record-time-mode").on("change.record-time-mode", function () {
+      NX.recordTaskTimeModeToggle($(this).val());
+    });
+    NX.recordTaskTimeModeToggle($("#timer_entry_mode").val());
+  }
+
   //create status - form validation
   $("#commonModalForm").validate().destroy();
   $("#commonModalForm").validate({
@@ -4125,6 +4307,16 @@ function NXRecordMyTmeModal() {
       manual_time_hours: "required",
       manual_time_minutes: "required",
       timer_created_edit: "required",
+      my_assigned_tasks: {
+        required: function () {
+          return !$("#timer_entry_mode").length || $("#timer_entry_mode").val() == 'task';
+        }
+      },
+      timesheet_clientid: {
+        required: function () {
+          return $("#timer_entry_mode").length && $("#timer_entry_mode").val() == 'client';
+        }
+      },
     },
     submitHandler: function (form) {
       //ajax request
@@ -6104,6 +6296,9 @@ function convertLeadAIMarkdown() {
 // Ensure convertLeadAIMarkdown runs after every AJAX load of leads AI modal/tab
 $(document).on('shown.bs.modal', '#basicModal', function () {
   convertLeadAIMarkdown();
+  if ($(this).find('#feedbackForm').length && typeof NXAddEditFeedback === 'function') {
+    NXAddEditFeedback();
+  }
 });
 
 // When a tab is loaded via AJAX, also run convertLeadAIMarkdown
@@ -6111,6 +6306,9 @@ $(document).on('ajaxComplete', function (event, xhr, settings) {
   // Only run for leads AI analysis modal/tab loads
   if (settings.url && settings.url.includes('/leads/analyze-ai/')) {
     convertLeadAIMarkdown();
+  }
+  if (settings.url && settings.url.includes('/feedback/create') && $('#basicModal #feedbackForm').length && typeof NXAddEditFeedback === 'function') {
+    NXAddEditFeedback();
   }
 });
 

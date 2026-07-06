@@ -72,8 +72,9 @@ class EventRepository {
             $events->where('event_show_in_timeline', 'yes');
         }
 
-        //default sorting
-        $events->orderBy('event_id', 'desc');
+        //default sorting (true chronology)
+        $events->orderByRaw('COALESCE(events.event_created, events.event_updated) DESC');
+        $events->orderBy('events.event_id', 'desc');
 
         //was pagination passed
         if (isset($data['pagination']) && is_numeric($data['pagination'])) {

@@ -9,6 +9,36 @@
 <div class="x-description">{!! clean($event->event_item_content) !!}</div>
 @endif
 
+<!--note-->
+@if($event->event_item == 'note')
+<div class="x-description">
+        @if($event->event_item_content != '')
+        <div><strong>{!! clean($event->event_item_content) !!}</strong></div>
+        @endif
+        @if($event->event_item_content2 != '')
+        <div>{!! clean($event->event_item_content2) !!}</div>
+        @endif
+</div>
+@endif
+
+<!--ai health summary-->
+@if($event->event_item == 'ai_health_summary')
+<div class="x-description" style="margin-top:10px;">
+        <div style="background:#efe9fb; border:1px solid #d8c9f3; border-left:4px solid #a78bdb; border-radius:8px; padding:14px;">
+                <div style="display:flex; align-items:center; margin-bottom:8px; color:#5b3f88; font-weight:600;">
+                        <i class="fas fa-robot" style="margin-right:8px;"></i>
+                        <span>Resumen generado con IA</span>
+                </div>
+
+                @if($event->event_item_content != '')
+                <div style="font-weight:600; color:#4b386f; margin-bottom:8px;">{{ $event->event_item_content }}</div>
+                @endif
+
+                <div style="white-space: pre-line; color:#3f3f46; line-height:1.55;">{{ $event->event_item_content2 }}</div>
+        </div>
+</div>
+@endif
+
 <!--status-->
 @if($event->event_item == 'status')
 <div class="x-description"><strong>{{ cleanLang(__('lang.new_status')) }}:</strong>

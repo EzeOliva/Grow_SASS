@@ -95,6 +95,15 @@ class Feedback extends Controller
         return new FilterDataResponse($payload);
     }
 
+    /**
+     * Skip feedback for this session
+     */
+    public function skip()
+    {
+        session(['feedback_skipped' => true]);
+        return redirect('/home');
+    }
+
     public function create() {
 
         $feedbackQueries = $this->feedbackQueryRepository->all();
@@ -169,6 +178,8 @@ class Feedback extends Controller
                 'feedbacks' => $this->feedbackRepository->getFeedbackSummariesForClient(),
                 'newFeedback'=> $newFeedback->feedback_id,
             ];
+            // Invalidate feedback-needed cache so middleware stops redirecting
+            \Illuminate\Support\Facades\Cache::forget('feedback_needed_' . Auth::user()->clientid);
         } else {
             $payload = [
                 'success'=> false,
@@ -195,9 +206,11 @@ class Feedback extends Controller
 
     public function destroy(Request $request, $id) {
         $result = $this->feedbackRepository->deleteFeedbackWithDetails($id);
-        if( $result ) 
+        if( $result ) {
+            // Invalidate feedback-needed cache so middleware rechecks
+            \Illuminate\Support\Facades\Cache::forget('feedback_needed_' . Auth::user()->clientid);
             return response()->json(['success'=> true,'message'=> __('lang.request_has_been_completed')]);
-        else
+        } else
             return response()->json(['success'=> false,'message'=> __('lang.request_is_invalid')]);
     }
 

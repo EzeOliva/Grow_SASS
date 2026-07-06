@@ -84,6 +84,31 @@ class General {
             }
         }
 
+        //check if client needs to submit feedback (last feedback > 90 days ago)
+        if (auth()->check() && auth()->user()->is_client && !request()->ajax()) {
+            $currentPath = request()->path();
+            $excludedPaths = ($currentPath === 'logout' || strpos($currentPath, 'feedback') === 0);
+            if (!$excludedPaths) {
+                $clientId = auth()->user()->clientid;
+                if ($clientId) {
+                    $cacheKey = 'feedback_needed_' . $clientId;
+                    $needsFeedback = \Illuminate\Support\Facades\Cache::remember(
+                        $cacheKey,
+                        3600,
+                        function () use ($clientId) {
+                            $lastFeedback = \App\Models\Feedback::where('client_id', $clientId)
+                                ->orderBy('feedback_date', 'desc')
+                                ->value('feedback_date');
+                            return !$lastFeedback || \Carbon\Carbon::parse($lastFeedback)->lt(now()->subDays(90));
+                        }
+                    );
+                    if ($needsFeedback && !session('feedback_skipped')) {
+                        return redirect('/feedback?pending=1');
+                    }
+                }
+            }
+        }
+
         //get all categories that a user is assigned to
         if (auth()->check()) {
             $categories = \App\Models\Category::Where('category_type', 'project')->orderBy('category_name', 'asc')->get();

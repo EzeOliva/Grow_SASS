@@ -99,6 +99,7 @@ Route::group(['prefix' => 'clients'], function () {
     Route::post('/{client}/generate-ai-comments-analysis', 'Clients@generateAICommentsAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.comments');
     Route::post('/{client}/generate-ai-health-analysis', 'Clients@generateAIHealthAnalysis')->where('client', '[0-9]+')->name('clients.generate.ai.health');
     Route::post('/{client}/generate-ai-meeting-prep', 'Clients@generateAIMeetingPrep')->where('client', '[0-9]+')->name('clients.generate.ai.meeting.prep');
+    Route::post('/{client}/publish-ai-health-summary', 'Clients@publishAIHealthSummary')->where('client', '[0-9]+')->name('clients.publish.ai.health.summary')->middleware(['demoModeCheck']);
 });
 Route::any("/client/{x}/profile", "Clients@profile")->where('x', '[0-9]+');
 Route::resource('clients', 'Clients');
@@ -116,6 +117,7 @@ Route::resource('users', 'Contacts');
 Route::group(['prefix' => 'team'], function () {
     Route::any("/search", "Team@index");
     Route::get("/updatepreferences", "Team@updatePreferences");
+    Route::get("/{id}/completed-tasks/modal", "Team@adminCompletedTasksModal")->where('id', '[0-9]+');
 });
 Route::resource('team', 'Team');
 
@@ -526,6 +528,14 @@ Route::group(['prefix' => 'canned'], function () {
 });
 Route::resource('canned', 'Canned');
 
+//SUPPORT AGENTS
+Route::group(['prefix' => 'support-agents'], function () {
+    Route::any('/search', 'SupportAgents@index');
+    Route::get('/{agent}/test', 'SupportAgents@test')->where('agent', '[0-9]+');
+    Route::post('/{agent}/test', 'SupportAgents@testAsk')->where('agent', '[0-9]+');
+});
+Route::resource('support-agents', 'SupportAgents');
+
 //TIMELINE
 Route::group(['prefix' => 'timeline'], function () {
     Route::any("/client", "Timeline@clientTimeline");
@@ -736,6 +746,7 @@ Route::resource('kb', 'Knowledgebase');
 // FEEDBACK
 Route::group(['prefix'=> 'feedback'], function () {
     Route::get('/', 'Feedback@index');
+    Route::get('/skip', 'Feedback@skip');
     Route::get('/create', 'Feedback@create');
     Route::post('/create', 'Feedback@store');
     Route::get('/fetch', 'Feedback@filterData');
@@ -744,6 +755,14 @@ Route::group(['prefix'=> 'feedback'], function () {
     Route::delete('/delete/{id}', 'Feedback@destroy')->where('id', '[0-9]+');
     Route::get('/{feedback}/details', [\App\Http\Controllers\Feedback::class, 'details'])
      ->name('feedback.details');
+
+    // External public feedback (no auth required)
+    Route::get('/external/{token}', [\App\Http\Controllers\FeedbackExternal::class, 'show'])->name('feedback.external.show');
+    Route::post('/external/{token}', [\App\Http\Controllers\FeedbackExternal::class, 'store'])->name('feedback.external.store');
+    Route::post('/external/{token}/suggest', [\App\Http\Controllers\FeedbackExternal::class, 'suggest'])->name('feedback.external.suggest');
+
+    // Generate token (admin)
+    Route::post('/generate-token/{client}', [\App\Http\Controllers\FeedbackExternal::class, 'generateToken'])->where('client', '[0-9]+')->name('feedback.generate.token');
    
 });
 
@@ -1371,6 +1390,7 @@ Route::group(['prefix' => 'report'], function () {
 
     //clients
     Route::any("/clients/overview", "Reports\Clients@overview");
+    Route::any("/clients/health-by-stage", "Reports\Clients@stageHealth");
 
     //timesheets
     Route::any("/timesheets/team", "Reports\Timesheets@team");

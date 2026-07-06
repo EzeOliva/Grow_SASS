@@ -26,8 +26,16 @@ class CreateResponse implements Responsable {
      */
     public function toResponse($request) {
 
+        //set all data to arrays
+        foreach ($this->payload as $key => $value) {
+            $$key = $value;
+        }
+
+        //default
+        $clients = $clients ?? collect();
+
         //render the form
-        $html = view('pages/timesheets/components/modals/record-time')->render();
+        $html = view('pages/timesheets/components/modals/record-time', compact('clients'))->render();
         $jsondata['dom_html'][] = array(
             'selector' => '#commonModalBody',
             'action' => 'replace',

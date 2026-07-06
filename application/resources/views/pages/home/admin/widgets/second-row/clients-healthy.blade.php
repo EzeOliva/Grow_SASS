@@ -2,7 +2,7 @@
     $stats = $payload['stats'];
 @endphp
 
-<div class="col-lg-3 col-md-12" id="dashboard-widgets-client-healthy-status">
+<div class="col-lg-4 col-md-12" id="dashboard-widgets-client-healthy-status">
     <div class="card">
         <div class="card-body">
             <div class="d-flex m-b-30 no-block">

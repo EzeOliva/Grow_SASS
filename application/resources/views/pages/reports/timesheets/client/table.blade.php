@@ -9,6 +9,14 @@
                 <th class="col_project_id"><a href="javascript:void(0)">@lang('lang.client')<span
                             class="sorting-icons"><i class="ti-arrows-vertical"></i></span></a></th>
 
+                <!--timesheet_collaborator-->
+                <th class="col_project_id"><a href="javascript:void(0)">@lang('lang.user')<span
+                        class="sorting-icons"><i class="ti-arrows-vertical"></i></span></a></th>
+
+                <!--timesheet_project-->
+                <th class="col_project_id"><a href="javascript:void(0)">@lang('lang.project')<span
+                    class="sorting-icons"><i class="ti-arrows-vertical"></i></span></a></th>
+
 
                 <!--sum_not_invoiced-->
                 <th class="col_count_projects_completed"><a href="javascript:void(0)">@lang('lang.not_invoiced')<span class="sorting-icons"><i

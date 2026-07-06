@@ -354,6 +354,14 @@
                                 class="{{ $page['submenu_knowledgebase'] ?? '' }}">{{ cleanLang(__('lang.knowledgebase')) }}</a>
                         </li>
                         @endif
+                        <!--support agents-->
+                        @if(auth()->user()->is_team)
+                        <li class="sidenav-submenu {{ $page['submenu_support_agents'] ?? '' }}"
+                            id="submenu_support_agents">
+                            <a href="{{ _url('/support-agents') }}"
+                                class="{{ $page['submenu_support_agents'] ?? '' }}">Agentes IA</a>
+                        </li>
+                        @endif
                         <!--messaging-->
                         @if(config('visibility.modules.messages'))
                         <li class="sidenav-submenu {{ $page['submenu_messages'] ?? '' }}" id="submenu_messages">

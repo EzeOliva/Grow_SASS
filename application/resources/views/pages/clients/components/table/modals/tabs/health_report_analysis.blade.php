@@ -134,38 +134,65 @@
 </div>
 
 <script>
-if (typeof window.generateClientHealthAnalysis !== 'function') {
-    window.generateClientHealthAnalysis = function (clientId, period, buttonEl) {
-        const responseDiv = document.getElementById('ai-response-health');
-        const button = buttonEl || event.target.closest('button');
-        const originalText = button.innerHTML;
+window.__clientHealthLastReport = window.__clientHealthLastReport || null;
 
-        responseDiv.style.display = 'block';
-        responseDiv.innerHTML = `
-            <div class="alert alert-info">
-                <i class="fas fa-spinner fa-spin"></i> Generando informe...
-            </div>
-        `;
+window.clientHealthNotify = function (type, message) {
+    if (window.NX && typeof NX.notification === 'function') {
+        NX.notification({ type: type, message: message });
+        return;
+    }
 
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+    // Keep silent fallback to avoid browser blocking alerts.
+    console.log(message);
+}
 
-        $.ajax({
-            url: `/clients/${clientId}/generate-ai-health-analysis`,
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-            },
-            data: {
-                period: period
-            },
-            success: function (response) {
-                if (response.success) {
-                    const htmlContent = marked.parse(response.analysis);
-                    responseDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><i class="fas fa-check-circle"></i> Informe generado</h6>
+window.generateClientHealthAnalysis = function (clientId, period, buttonEl) {
+    const responseDiv = document.getElementById('ai-response-health');
+    const button = buttonEl || event.target.closest('button');
+    const originalText = button.innerHTML;
+
+    responseDiv.style.display = 'block';
+    responseDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin"></i> Generando informe...
+        </div>
+    `;
+
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+
+    $.ajax({
+        url: `/clients/${clientId}/generate-ai-health-analysis`,
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        data: {
+            period: period
+        },
+        success: function (response) {
+            if (response.success) {
+                window.__clientHealthLastReport = {
+                    clientId: clientId,
+                    period: period,
+                    analysis: response.analysis || ''
+                };
+
+                const htmlContent = marked.parse(response.analysis);
+                responseDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="fas fa-check-circle"></i> Informe generado</h6>
+                            <div class="d-flex align-items-center">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-primary mr-2"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="Agregar este resumen a la línea de tiempo del cliente"
+                                    onclick="publishClientHealthSummary(this)">
+                                    <i class="fas fa-stream"></i> Agregar a línea de tiempo
+                                </button>
                                 <button
                                     type="button"
                                     class="btn btn-sm btn-outline-secondary"
@@ -176,42 +203,87 @@ if (typeof window.generateClientHealthAnalysis !== 'function') {
                                     <i class="fas fa-file-pdf"></i>
                                 </button>
                             </div>
-                            <div class="mt-3 ai-report-printable">
-                                <div class="ai-analysis-content" style="font-size: 14px; line-height: 1.6;">
-                                    ${htmlContent}
-                                </div>
+                        </div>
+                        <div class="mt-3 ai-report-printable">
+                            <div class="ai-analysis-content" style="font-size: 14px; line-height: 1.6;">
+                                ${htmlContent}
                             </div>
                         </div>
-                    `;
+                    </div>
+                `;
 
-                    const analysisLinks = responseDiv.querySelectorAll('.ai-analysis-content a');
-                    analysisLinks.forEach(function (link) {
-                        link.setAttribute('target', '_blank');
-                        link.setAttribute('rel', 'noopener noreferrer');
-                    });
-                } else {
-                    responseDiv.innerHTML = `
-                        <div class="alert alert-danger">
-                            <h6><i class="fas fa-exclamation-triangle"></i> Error al generar informe</h6>
-                            <p>${response.message}</p>
-                        </div>
-                    `;
-                }
-            },
-            error: function () {
+                const analysisLinks = responseDiv.querySelectorAll('.ai-analysis-content a');
+                analysisLinks.forEach(function (link) {
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
+                });
+            } else {
                 responseDiv.innerHTML = `
                     <div class="alert alert-danger">
                         <h6><i class="fas fa-exclamation-triangle"></i> Error al generar informe</h6>
-                        <p>Ocurrió un error al generar el informe. Intenta nuevamente.</p>
+                        <p>${response.message}</p>
                     </div>
                 `;
-            },
-            complete: function () {
-                button.disabled = false;
-                button.innerHTML = originalText;
             }
-        });
+        },
+        error: function () {
+            responseDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> Error al generar informe</h6>
+                    <p>Ocurrió un error al generar el informe. Intenta nuevamente.</p>
+                </div>
+            `;
+        },
+        complete: function () {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    });
+}
+
+window.publishClientHealthSummary = function (buttonEl) {
+    const report = window.__clientHealthLastReport || {};
+    const button = buttonEl || event.target.closest('button');
+
+    if (!report.clientId || !report.analysis) {
+        window.clientHealthNotify('warning', 'Primero generá el informe IA antes de agregarlo a la línea de tiempo.');
+        return;
     }
+
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+
+    $.ajax({
+        url: `/clients/${report.clientId}/publish-ai-health-summary`,
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        data: {
+            period: report.period || 'week',
+            analysis: report.analysis || ''
+        },
+        success: function (response) {
+            if (response.success) {
+                window.clientHealthNotify('success', response.message || 'Resumen IA agregado a la línea de tiempo.');
+            } else {
+                window.clientHealthNotify('error', response.message || 'No se pudo agregar el resumen a la línea de tiempo.');
+            }
+        },
+        error: function (xhr) {
+            let message = 'Ocurrió un error al agregar el resumen a la línea de tiempo.';
+            if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                message = xhr.responseJSON.message;
+            }
+
+            window.clientHealthNotify('error', message);
+        },
+        complete: function () {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    });
 }
 
 if (typeof window.printClientHealthReport !== 'function') {

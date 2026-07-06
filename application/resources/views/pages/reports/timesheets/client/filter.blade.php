@@ -52,6 +52,20 @@
             </div>
         </div>
 
+        <!--client-->
+        <div class="form-group row">
+            <select class="select2-basic form-control form-control-sm" id="filter_timer_clientid"
+                style="width:220px;" name="filter_timer_clientid" data-width="resolve">
+                <option value="">@lang('lang.client') (@lang('lang.all'))</option>
+                @foreach($clients ?? [] as $client)
+                <option value="{{ $client->client_id }}"
+                    {{ runtimePreselected(request('filter_timer_clientid', ''), $client->client_id) }}>
+                    {{ $client->client_company_name }}
+                </option>
+                @endforeach
+            </select>
+        </div>
+
         <!--form buttons-->
         <div class="col-auto">
             <input type="hidden" name="report-form" value="filter">
