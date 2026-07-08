@@ -3,7 +3,7 @@
     $canViewReports = auth()->user()->is_team && (auth()->user()->role->role_reports ?? 'no') === 'yes';
 @endphp
 
-<div class="col-lg-4 col-md-12" id="dashboard-widgets-stage-health-snapshot">
+<div class="col-lg-3 col-md-12" id="dashboard-widgets-stage-health-snapshot">
     <div class="card">
         <div class="card-body">
             <div class="d-flex m-b-20 no-block">

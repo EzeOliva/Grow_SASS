@@ -96,6 +96,11 @@ class General {
                         $cacheKey,
                         3600,
                         function () use ($clientId) {
+                            // Don't ask for feedback if client is less than 90 days old
+                            $client = \App\Models\Client::where('client_id', $clientId)->value('client_created');
+                            if ($client && \Carbon\Carbon::parse($client)->gt(now()->subDays(90))) {
+                                return false;
+                            }
                             $lastFeedback = \App\Models\Feedback::where('client_id', $clientId)
                                 ->orderBy('feedback_date', 'desc')
                                 ->value('feedback_date');

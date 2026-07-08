@@ -2,7 +2,7 @@
     $feedbacks = $payload['feedbacks'];
 @endphp
 
-<div class="col-lg-4 col-md-12" id="dashboard-widgets-feedbacks">
+<div class="col-lg-6 col-md-12" id="dashboard-widgets-feedbacks">
     <div class="card">
         <div class="card-body">
             <div class="d-flex m-b-30 no-block">
